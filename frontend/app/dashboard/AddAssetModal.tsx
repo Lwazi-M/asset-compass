@@ -1,21 +1,48 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import axios from "axios";
 import { X, CheckCircle, Loader2 } from "lucide-react";
+
+// Define Asset Type locally to avoid circular dependencies
+interface Asset {
+  id: number;
+  name: string;
+  type: string;
+  value: number;
+  currency: string;
+  lastUpdated: string;
+}
 
 interface AddAssetModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onAssetAdded: () => void; // Tell the parent to refresh the list
+  onAssetAdded: () => void;
+  initialData?: Asset | null; // <--- New Prop: Data to Edit
 }
 
-export default function AddAssetModal({ isOpen, onClose, onAssetAdded }: AddAssetModalProps) {
+export default function AddAssetModal({ isOpen, onClose, onAssetAdded, initialData }: AddAssetModalProps) {
   const [name, setName] = useState("");
   const [type, setType] = useState("STOCK");
   const [value, setValue] = useState("");
   const [currency, setCurrency] = useState("USD");
   const [loading, setLoading] = useState(false);
+
+  // POPULATE FORM WHEN EDITING
+  useEffect(() => {
+    if (initialData) {
+      setName(initialData.name);
+      setType(initialData.type);
+      setValue(initialData.value.toString());
+      setCurrency(initialData.currency);
+    } else {
+      // Clear form if adding new
+      setName("");
+      setType("STOCK");
+      setValue("");
+      setCurrency("USD");
+    }
+  }, [initialData, isOpen]);
 
   if (!isOpen) return null;
 
@@ -25,26 +52,29 @@ export default function AddAssetModal({ isOpen, onClose, onAssetAdded }: AddAsse
 
     try {
       const token = localStorage.getItem("token");
-      await axios.post(
-        "/api/assets",
-        {
-          name,
-          type,
-          value: parseFloat(value),
-          currency,
-        },
-        {
-          headers: { Authorization: `Bearer ${token}` },
-        }
-      );
+      const payload = {
+        name,
+        type,
+        value: parseFloat(value),
+        currency,
+      };
 
-      // Reset form and close
-      setName("");
-      setValue("");
-      onAssetAdded(); // Refresh the dashboard!
+      if (initialData) {
+        // EDIT MODE (PUT)
+        await axios.put(`/api/assets/${initialData.id}`, payload, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+      } else {
+        // CREATE MODE (POST)
+        await axios.post("/api/assets", payload, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+      }
+
+      onAssetAdded(); // Refresh Dashboard
       onClose();
     } catch (err) {
-      alert("Failed to add asset. Please try again.");
+      alert("Failed to save asset. Please try again.");
     } finally {
       setLoading(false);
     }
@@ -54,16 +84,16 @@ export default function AddAssetModal({ isOpen, onClose, onAssetAdded }: AddAsse
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in duration-200">
       <div className="w-full max-w-md bg-gray-900 border border-gray-800 rounded-2xl shadow-2xl p-6 relative">
 
-        {/* Close Button */}
         <button onClick={onClose} className="absolute top-4 right-4 text-gray-500 hover:text-white">
           <X className="h-5 w-5" />
         </button>
 
-        <h2 className="text-xl font-bold mb-6 text-white">Add New Asset</h2>
+        <h2 className="text-xl font-bold mb-6 text-white">
+          {initialData ? "Edit Asset" : "Add New Asset"}
+        </h2>
 
         <form onSubmit={handleSubmit} className="space-y-4">
 
-          {/* Asset Name */}
           <div>
             <label className="block text-sm font-medium text-gray-400 mb-1">Asset Name</label>
             <input
@@ -71,12 +101,11 @@ export default function AddAssetModal({ isOpen, onClose, onAssetAdded }: AddAsse
               required
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder="e.g. Apple Stock, Beach House"
+              placeholder="e.g. Apple Stock"
               className="w-full bg-gray-950 border border-gray-800 rounded-lg py-2.5 px-4 focus:ring-2 focus:ring-blue-500 outline-none text-white"
             />
           </div>
 
-          {/* Type & Currency Row */}
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-400 mb-1">Type</label>
@@ -107,7 +136,6 @@ export default function AddAssetModal({ isOpen, onClose, onAssetAdded }: AddAsse
             </div>
           </div>
 
-          {/* Value */}
           <div>
             <label className="block text-sm font-medium text-gray-400 mb-1">Current Value</label>
             <div className="relative">
@@ -124,7 +152,6 @@ export default function AddAssetModal({ isOpen, onClose, onAssetAdded }: AddAsse
             </div>
           </div>
 
-          {/* Submit Button */}
           <button
             disabled={loading}
             className="w-full bg-blue-600 hover:bg-blue-500 text-white font-semibold py-3 rounded-lg transition-all flex items-center justify-center gap-2 mt-4"
