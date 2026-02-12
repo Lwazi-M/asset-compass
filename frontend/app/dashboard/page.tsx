@@ -4,7 +4,7 @@ import AddAssetModal from "./AddAssetModal";
 import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import axios from "axios";
-import { LogOut, Shield, Plus, Wallet, TrendingUp, DollarSign } from "lucide-react";
+import { LogOut, Shield, Plus, Wallet, TrendingUp, DollarSign, Trash2 } from "lucide-react";
 
 // Types
 interface UserData {
@@ -28,9 +28,9 @@ export default function Dashboard() {
   const [user, setUser] = useState<UserData | null>(null);
   const [assets, setAssets] = useState<Asset[]>([]);
   const [loading, setLoading] = useState(true);
-  const [isModalOpen, setIsModalOpen] = useState(false); // <--- New State
+  const [isModalOpen, setIsModalOpen] = useState(false);
 
-  // Define fetchAssets outside useEffect so we can call it when an asset is added
+  // Define fetchAssets outside useEffect so we can call it when an asset is added or deleted
   const fetchAssets = useCallback(async () => {
     const token = localStorage.getItem("token");
     if (!token) return;
@@ -61,12 +61,11 @@ export default function Dashboard() {
         });
         setUser(userRes.data);
 
-        // 2. Get Assets (using our reusable function)
+        // 2. Get Assets
         await fetchAssets();
 
         setLoading(false);
       } catch (err) {
-        // If anything fails, kick them out
         localStorage.removeItem("token");
         router.push("/");
       }
@@ -78,6 +77,22 @@ export default function Dashboard() {
   const handleLogout = () => {
     localStorage.removeItem("token");
     router.push("/");
+  };
+
+  // NEW: Delete Handler
+  const handleDelete = async (id: number) => {
+    if (!confirm("Are you sure you want to delete this asset?")) return;
+
+    try {
+      const token = localStorage.getItem("token");
+      await axios.delete(`/api/assets/${id}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      // Refresh list immediately after delete
+      fetchAssets();
+    } catch (err) {
+      alert("Failed to delete asset. You might not be authorized.");
+    }
   };
 
   if (loading) {
@@ -137,7 +152,6 @@ export default function Dashboard() {
             <p className="text-3xl font-bold text-white">{assets.length}</p>
         </div>
 
-        {/* Add New Asset Button - Now triggers the modal! */}
         <button
             onClick={() => setIsModalOpen(true)}
             className="group bg-gray-900 border border-dashed border-gray-700 hover:border-blue-500 hover:bg-gray-800 p-6 rounded-2xl flex flex-col items-center justify-center transition-all cursor-pointer"
@@ -162,7 +176,7 @@ export default function Dashboard() {
         ) : (
             <div className="divide-y divide-gray-800">
                 {assets.map((asset) => (
-                    <div key={asset.id} className="p-6 flex justify-between items-center hover:bg-gray-800/50 transition-colors">
+                    <div key={asset.id} className="p-6 flex justify-between items-center hover:bg-gray-800/50 transition-colors group">
                         <div className="flex items-center gap-4">
                             <div className="h-10 w-10 bg-gray-800 rounded-full flex items-center justify-center text-gray-400">
                                 <DollarSign className="h-5 w-5" />
@@ -172,9 +186,21 @@ export default function Dashboard() {
                                 <p className="text-xs text-gray-500 uppercase tracking-wide">{asset.type}</p>
                             </div>
                         </div>
-                        <div className="text-right">
-                            <p className="font-bold text-white text-lg">${asset.value.toLocaleString()}</p>
-                            <p className="text-xs text-gray-500">{asset.currency}</p>
+
+                        <div className="flex items-center gap-6">
+                            <div className="text-right">
+                                <p className="font-bold text-white text-lg">${asset.value.toLocaleString()}</p>
+                                <p className="text-xs text-gray-500">{asset.currency}</p>
+                            </div>
+
+                            {/* Delete Button (Only visible on hover) */}
+                            <button
+                                onClick={() => handleDelete(asset.id)}
+                                className="text-gray-600 hover:text-red-500 transition-colors opacity-0 group-hover:opacity-100"
+                                title="Delete Asset"
+                            >
+                                <Trash2 className="h-5 w-5" />
+                            </button>
                         </div>
                     </div>
                 ))}
@@ -182,11 +208,10 @@ export default function Dashboard() {
         )}
       </div>
 
-      {/* The Modal Component */}
       <AddAssetModal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
-        onAssetAdded={fetchAssets} // Refresh list when done!
+        onAssetAdded={fetchAssets}
       />
 
     </div>
