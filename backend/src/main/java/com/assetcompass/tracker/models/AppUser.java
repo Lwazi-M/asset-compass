@@ -21,4 +21,7 @@ public class AppUser {
     private String fullName;
 
     private String role; // e.g., "USER", "ADMIN"
+
+    private String verificationCode; // Stores "123456"
+    private java.time.LocalDateTime verificationCodeExpiresAt; // Stores when it dies
 }
