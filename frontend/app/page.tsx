@@ -3,6 +3,7 @@
 import { useState } from "react";
 import axios from "axios";
 import { Lock, Mail, Key, ArrowRight, CheckCircle } from "lucide-react";
+import { useRouter } from "next/navigation";
 
 export default function LoginPage() {
   const [step, setStep] = useState<"login" | "verify">("login");
@@ -11,6 +12,8 @@ export default function LoginPage() {
   const [code, setCode] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+
+  const router = useRouter();
 
   // STEP 1: Send Password -> Get Code
   const handleLogin = async (e: React.FormEvent) => {
@@ -38,10 +41,13 @@ export default function LoginPage() {
     try {
       const res = await axios.post("/api/auth/verify", { email, code });
       const token = res.data.token;
-      
+
       // Save the VIP Badge!
       localStorage.setItem("token", token);
-      alert("LOGIN SUCCESS! Token: " + token.substring(0, 15) + "...");
+
+      // Step 3.4: Redirect to Dashboard 🚀
+      router.push("/dashboard");
+
     } catch (err) {
       setError("Invalid code. Please check your email console.");
     } finally {
