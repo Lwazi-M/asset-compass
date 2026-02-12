@@ -15,16 +15,16 @@ public class Asset {
     private Long id;
 
     @Column(nullable = false)
-    private String name;        // e.g., "Apple Stock", "Bitcoin", "Rental Property"
+    private String name;        // e.g., "BTC", "TSLA", "ETH"
 
     @Column(nullable = false)
-    private String type;        // e.g., "STOCK", "CRYPTO", "REAL_ESTATE", "CASH"
+    private String type;        // e.g., "STOCK", "CRYPTO", "REAL_ESTATE"
+
+    @Column(nullable = false, precision = 19, scale = 4)
+    private BigDecimal value;   // Precise financial data
 
     @Column(nullable = false)
-    private BigDecimal value;   // e.g., 1500.50 (Always use BigDecimal for money!)
-
-    @Column(nullable = false)
-    private String currency;    // e.g., "USD", "ZAR", "EUR"
+    private String currency;    // e.g., "USD", "ZAR"
 
     private LocalDateTime lastUpdated;
 
