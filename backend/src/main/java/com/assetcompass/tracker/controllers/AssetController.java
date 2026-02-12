@@ -3,8 +3,10 @@ package com.assetcompass.tracker.controllers;
 import com.assetcompass.tracker.dtos.AssetDTO;
 import com.assetcompass.tracker.models.AppUser;
 import com.assetcompass.tracker.models.Asset;
+import com.assetcompass.tracker.models.Transaction;
 import com.assetcompass.tracker.repositories.AppUserRepository;
 import com.assetcompass.tracker.repositories.AssetRepository;
+import com.assetcompass.tracker.repositories.TransactionRepository;
 import com.assetcompass.tracker.services.PriceService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -22,11 +24,16 @@ public class AssetController {
     private final AssetRepository assetRepository;
     private final AppUserRepository userRepository;
     private final PriceService priceService;
+    private final TransactionRepository transactionRepository; // Added
 
-    public AssetController(AssetRepository assetRepository, AppUserRepository userRepository, PriceService priceService) {
+    public AssetController(AssetRepository assetRepository,
+                           AppUserRepository userRepository,
+                           PriceService priceService,
+                           TransactionRepository transactionRepository) { // Updated constructor
         this.assetRepository = assetRepository;
         this.userRepository = userRepository;
         this.priceService = priceService;
+        this.transactionRepository = transactionRepository;
     }
 
     @GetMapping
@@ -53,6 +60,10 @@ public class AssetController {
         asset.setLastUpdated(LocalDateTime.now());
 
         Asset savedAsset = assetRepository.save(asset);
+
+        // Log initial transaction
+        logTransaction(savedAsset, assetDTO.getValue(), "INITIAL_DEPOSIT");
+
         return ResponseEntity.ok(convertToDTO(savedAsset));
     }
 
@@ -91,6 +102,10 @@ public class AssetController {
         asset.setLastUpdated(LocalDateTime.now());
 
         assetRepository.save(asset);
+
+        // Log manual update as a transaction
+        logTransaction(asset, assetDTO.getValue(), "MANUAL_UPDATE");
+
         return ResponseEntity.ok(convertToDTO(asset));
     }
 
@@ -110,14 +125,32 @@ public class AssetController {
         BigDecimal newPrice = priceService.fetchPrice(symbol);
 
         if (newPrice.compareTo(BigDecimal.ZERO) > 0) {
-            // FIX: Removed .doubleValue() to maintain BigDecimal precision
             asset.setValue(newPrice);
             asset.setLastUpdated(LocalDateTime.now());
             assetRepository.save(asset);
+
+            // Log automatic refresh as a transaction
+            logTransaction(asset, newPrice, "PRICE_REFRESH");
+
             return ResponseEntity.ok(convertToDTO(asset));
         } else {
             return ResponseEntity.badRequest().body("Could not fetch price. Ensure asset name starts with a valid ticker symbol.");
         }
+    }
+
+    // 6. GET ASSET HISTORY
+    @GetMapping("/{id}/history")
+    public ResponseEntity<List<Transaction>> getAssetHistory(@PathVariable Long id) {
+        return ResponseEntity.ok(transactionRepository.findByAssetIdOrderByTimestampDesc(id));
+    }
+
+    // Private helper to log transactions
+    private void logTransaction(Asset asset, BigDecimal value, String type) {
+        Transaction transaction = new Transaction();
+        transaction.setAsset(asset);
+        transaction.setValueAtTime(value);
+        transaction.setType(type);
+        transactionRepository.save(transaction);
     }
 
     private AssetDTO convertToDTO(Asset asset) {
