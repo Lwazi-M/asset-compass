@@ -4,6 +4,8 @@ import jakarta.persistence.*;
 import lombok.Data;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.ArrayList; // Added
+import java.util.List;      // Added
 
 @Entity
 @Table(name = "assets")
@@ -32,6 +34,10 @@ public class Asset {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id", nullable = false)
     private AppUser user;
+
+    // NEW RELATIONSHIP: One Asset has many Transactions (History)
+    @OneToMany(mappedBy = "asset", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<Transaction> history = new ArrayList<>();
 
     @PrePersist
     @PreUpdate
