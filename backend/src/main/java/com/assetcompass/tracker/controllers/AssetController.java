@@ -5,10 +5,12 @@ import com.assetcompass.tracker.models.AppUser;
 import com.assetcompass.tracker.models.Asset;
 import com.assetcompass.tracker.repositories.AppUserRepository;
 import com.assetcompass.tracker.repositories.AssetRepository;
+import com.assetcompass.tracker.services.PriceService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -19,55 +21,49 @@ public class AssetController {
 
     private final AssetRepository assetRepository;
     private final AppUserRepository userRepository;
+    private final PriceService priceService;
 
-    public AssetController(AssetRepository assetRepository, AppUserRepository userRepository) {
+    public AssetController(AssetRepository assetRepository, AppUserRepository userRepository, PriceService priceService) {
         this.assetRepository = assetRepository;
         this.userRepository = userRepository;
+        this.priceService = priceService;
     }
 
-    // 1. GET ALL ASSETS (For the logged-in user only)
     @GetMapping
     public List<AssetDTO> getMyAssets() {
         String email = SecurityContextHolder.getContext().getAuthentication().getName();
         AppUser user = userRepository.findByEmail(email).orElseThrow();
 
-        // Find assets for THIS user only
         return assetRepository.findByUserId(user.getId()).stream()
                 .map(this::convertToDTO)
                 .collect(Collectors.toList());
     }
 
-    // 2. ADD A NEW ASSET
     @PostMapping
     public ResponseEntity<AssetDTO> addAsset(@RequestBody AssetDTO assetDTO) {
         String email = SecurityContextHolder.getContext().getAuthentication().getName();
         AppUser user = userRepository.findByEmail(email).orElseThrow();
 
-        // Create the Asset
         Asset asset = new Asset();
         asset.setName(assetDTO.getName());
         asset.setType(assetDTO.getType());
         asset.setValue(assetDTO.getValue());
         asset.setCurrency(assetDTO.getCurrency());
-        asset.setUser(user); // Link it to the user!
+        asset.setUser(user);
         asset.setLastUpdated(LocalDateTime.now());
 
         Asset savedAsset = assetRepository.save(asset);
-
         return ResponseEntity.ok(convertToDTO(savedAsset));
     }
 
-    // 3. DELETE ASSET
     @DeleteMapping("/{id}")
     public ResponseEntity<?> deleteAsset(@PathVariable Long id) {
         String email = SecurityContextHolder.getContext().getAuthentication().getName();
         AppUser user = userRepository.findByEmail(email).orElseThrow();
 
-        // Find the asset
         Asset asset = assetRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Asset not found"));
 
-        // SECURITY CHECK: Does this asset belong to the logged-in user?
         if (!asset.getUser().getId().equals(user.getId())) {
             return ResponseEntity.status(403).body("You do not own this asset");
         }
@@ -76,7 +72,6 @@ public class AssetController {
         return ResponseEntity.ok().build();
     }
 
-    // 4. UPDATE ASSET (New!)
     @PutMapping("/{id}")
     public ResponseEntity<?> updateAsset(@PathVariable Long id, @RequestBody AssetDTO assetDTO) {
         String email = SecurityContextHolder.getContext().getAuthentication().getName();
@@ -85,12 +80,10 @@ public class AssetController {
         Asset asset = assetRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Asset not found"));
 
-        // Security Check: Ensure user owns the asset
         if (!asset.getUser().getId().equals(user.getId())) {
             return ResponseEntity.status(403).body("You do not own this asset");
         }
 
-        // Update Fields
         asset.setName(assetDTO.getName());
         asset.setType(assetDTO.getType());
         asset.setValue(assetDTO.getValue());
@@ -101,7 +94,32 @@ public class AssetController {
         return ResponseEntity.ok(convertToDTO(asset));
     }
 
-    // Helper to convert DB Entity -> Clean DTO
+    @PostMapping("/{id}/refresh")
+    public ResponseEntity<?> refreshAssetPrice(@PathVariable Long id) {
+        String email = SecurityContextHolder.getContext().getAuthentication().getName();
+        AppUser user = userRepository.findByEmail(email).orElseThrow();
+
+        Asset asset = assetRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Asset not found"));
+
+        if (!asset.getUser().getId().equals(user.getId())) {
+            return ResponseEntity.status(403).build();
+        }
+
+        String symbol = asset.getName().split(" ")[0];
+        BigDecimal newPrice = priceService.fetchPrice(symbol);
+
+        if (newPrice.compareTo(BigDecimal.ZERO) > 0) {
+            // FIX: Removed .doubleValue() to maintain BigDecimal precision
+            asset.setValue(newPrice);
+            asset.setLastUpdated(LocalDateTime.now());
+            assetRepository.save(asset);
+            return ResponseEntity.ok(convertToDTO(asset));
+        } else {
+            return ResponseEntity.badRequest().body("Could not fetch price. Ensure asset name starts with a valid ticker symbol.");
+        }
+    }
+
     private AssetDTO convertToDTO(Asset asset) {
         AssetDTO dto = new AssetDTO();
         dto.setId(asset.getId());
