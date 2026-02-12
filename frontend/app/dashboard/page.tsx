@@ -4,7 +4,7 @@ import AddAssetModal from "./AddAssetModal";
 import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import axios from "axios";
-import { LogOut, Shield, Plus, Wallet, TrendingUp, DollarSign, Trash2 } from "lucide-react";
+import { LogOut, Shield, Plus, Wallet, TrendingUp, DollarSign, Trash2, Pencil, RefreshCw } from "lucide-react";
 import PortfolioChart from "./PortfolioChart";
 
 // Types
@@ -29,7 +29,11 @@ export default function Dashboard() {
   const [user, setUser] = useState<UserData | null>(null);
   const [assets, setAssets] = useState<Asset[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshingId, setRefreshingId] = useState<number | null>(null);
+
+  // MODAL STATE
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editingAsset, setEditingAsset] = useState<Asset | null>(null);
 
   const fetchAssets = useCallback(async () => {
     const token = localStorage.getItem("token");
@@ -85,8 +89,34 @@ export default function Dashboard() {
       });
       fetchAssets();
     } catch (err) {
-      alert("Failed to delete asset. You might not be authorized.");
+      alert("Failed to delete asset.");
     }
+  };
+
+  // Handle Live Price Refresh
+  const handleRefresh = async (id: number) => {
+    setRefreshingId(id);
+    try {
+      const token = localStorage.getItem("token");
+      await axios.post(`/api/assets/${id}/refresh`, {}, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      await fetchAssets();
+    } catch (err) {
+      alert("Failed to fetch live price. Ensure the asset name starts with a valid ticker (e.g., BTC, TSLA).");
+    } finally {
+      setRefreshingId(null);
+    }
+  };
+
+  const handleEdit = (asset: Asset) => {
+    setEditingAsset(asset);
+    setIsModalOpen(true);
+  };
+
+  const handleCloseModal = () => {
+    setIsModalOpen(false);
+    setEditingAsset(null);
   };
 
   if (loading) {
@@ -100,7 +130,7 @@ export default function Dashboard() {
     );
   }
 
-  const totalValue = assets.reduce((sum, asset) => sum + asset.value, 0);
+  const totalValue = assets.reduce((sum, asset) => sum + Number(asset.value), 0);
 
   return (
     <div className="min-h-screen bg-gray-950 text-white p-6 md:p-10 relative">
@@ -127,18 +157,16 @@ export default function Dashboard() {
         </div>
       </nav>
 
-      {/* 1. Overview Stats Row */}
+      {/* Overview Stats */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10">
-        {/* Net Worth Card */}
         <div className="bg-gradient-to-br from-blue-900/50 to-gray-900 border border-blue-500/30 p-6 rounded-2xl">
             <div className="flex items-center gap-3 mb-2">
                 <Wallet className="h-5 w-5 text-blue-400" />
                 <h3 className="text-sm font-medium text-gray-300">Net Worth</h3>
             </div>
-            <p className="text-3xl font-bold text-white">${totalValue.toLocaleString()}</p>
+            <p className="text-3xl font-bold text-white">${totalValue.toLocaleString(undefined, { minimumFractionDigits: 2 })}</p>
         </div>
 
-        {/* Total Assets Card */}
         <div className="bg-gray-900 border border-gray-800 p-6 rounded-2xl">
              <div className="flex items-center gap-3 mb-2">
                 <TrendingUp className="h-5 w-5 text-green-400" />
@@ -147,7 +175,6 @@ export default function Dashboard() {
             <p className="text-3xl font-bold text-white">{assets.length}</p>
         </div>
 
-        {/* Add Button */}
         <button
             onClick={() => setIsModalOpen(true)}
             className="group bg-gray-900 border border-dashed border-gray-700 hover:border-blue-500 hover:bg-gray-800 p-6 rounded-2xl flex flex-col items-center justify-center transition-all cursor-pointer"
@@ -159,15 +186,15 @@ export default function Dashboard() {
         </button>
       </div>
 
-      {/* 2. Main Content Row (Chart + List) */}
+      {/* Content Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
 
-        {/* Left Column: Chart */}
+        {/* Chart */}
         <div className="lg:col-span-1">
             <PortfolioChart assets={assets} />
         </div>
 
-        {/* Right Column: Asset List */}
+        {/* List */}
         <div className="lg:col-span-2 bg-gray-900 border border-gray-800 rounded-2xl overflow-hidden shadow-xl">
             <div className="p-6 border-b border-gray-800 flex justify-between items-center">
                 <h2 className="text-xl font-bold">Your Portfolio</h2>
@@ -191,17 +218,38 @@ export default function Dashboard() {
                                 </div>
                             </div>
 
-                            <div className="flex items-center gap-6">
-                                <div className="text-right">
-                                    <p className="font-bold text-white text-lg">${asset.value.toLocaleString()}</p>
-                                    <p className="text-xs text-gray-500">{asset.currency}</p>
+                            <div className="flex items-center gap-2">
+                                <div className="text-right mr-4">
+                                    <p className="font-bold text-white text-lg">${Number(asset.value).toLocaleString(undefined, { minimumFractionDigits: 2 })}</p>
+                                    <p className="text-[10px] text-gray-500 italic">Last updated: {new Date(asset.lastUpdated).toLocaleTimeString()}</p>
                                 </div>
+
+                                {/* Refresh Button */}
+                                <button
+                                    onClick={() => handleRefresh(asset.id)}
+                                    disabled={refreshingId === asset.id}
+                                    className={`p-2 rounded-lg transition-all ${refreshingId === asset.id ? 'text-blue-500 animate-spin' : 'text-gray-600 hover:text-green-400 hover:bg-green-400/10 opacity-0 group-hover:opacity-100'}`}
+                                    title="Refresh Price"
+                                >
+                                    <RefreshCw className="h-4 w-4" />
+                                </button>
+
+                                {/* Edit Button */}
+                                <button
+                                    onClick={() => handleEdit(asset)}
+                                    className="p-2 text-gray-600 hover:text-blue-400 hover:bg-blue-400/10 rounded-lg transition-all opacity-0 group-hover:opacity-100"
+                                    title="Edit Asset"
+                                >
+                                    <Pencil className="h-4 w-4" />
+                                </button>
+
+                                {/* Delete Button */}
                                 <button
                                     onClick={() => handleDelete(asset.id)}
-                                    className="text-gray-600 hover:text-red-500 transition-colors opacity-0 group-hover:opacity-100"
+                                    className="p-2 text-gray-600 hover:text-red-400 hover:bg-red-400/10 rounded-lg transition-all opacity-0 group-hover:opacity-100"
                                     title="Delete Asset"
                                 >
-                                    <Trash2 className="h-5 w-5" />
+                                    <Trash2 className="h-4 w-4" />
                                 </button>
                             </div>
                         </div>
@@ -213,8 +261,9 @@ export default function Dashboard() {
 
       <AddAssetModal
         isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
+        onClose={handleCloseModal}
         onAssetAdded={fetchAssets}
+        initialData={editingAsset}
       />
 
     </div>
