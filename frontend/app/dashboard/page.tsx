@@ -1,6 +1,7 @@
 "use client";
 
 import AddAssetModal from "./AddAssetModal";
+import HistoryModal from "./HistoryModal"; //
 import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import axios from "axios";
@@ -33,7 +34,9 @@ export default function Dashboard() {
 
   // MODAL STATE
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isHistoryOpen, setIsHistoryOpen] = useState(false); //
   const [editingAsset, setEditingAsset] = useState<Asset | null>(null);
+  const [selectedAsset, setSelectedAsset] = useState<Asset | null>(null); //
 
   const fetchAssets = useCallback(async () => {
     const token = localStorage.getItem("token");
@@ -93,7 +96,6 @@ export default function Dashboard() {
     }
   };
 
-  // Handle Live Price Refresh
   const handleRefresh = async (id: number) => {
     setRefreshingId(id);
     try {
@@ -112,6 +114,12 @@ export default function Dashboard() {
   const handleEdit = (asset: Asset) => {
     setEditingAsset(asset);
     setIsModalOpen(true);
+  };
+
+  // Open history modal
+  const handleViewHistory = (asset: Asset) => {
+    setSelectedAsset(asset);
+    setIsHistoryOpen(true);
   };
 
   const handleCloseModal = () => {
@@ -135,7 +143,6 @@ export default function Dashboard() {
   return (
     <div className="min-h-screen bg-gray-950 text-white p-6 md:p-10 relative">
 
-      {/* Navbar */}
       <nav className="flex justify-between items-center mb-10 border-b border-gray-800 pb-6">
         <div className="flex items-center gap-3">
             <div className="bg-blue-600/20 p-2 rounded-lg">
@@ -157,7 +164,6 @@ export default function Dashboard() {
         </div>
       </nav>
 
-      {/* Overview Stats */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10">
         <div className="bg-gradient-to-br from-blue-900/50 to-gray-900 border border-blue-500/30 p-6 rounded-2xl">
             <div className="flex items-center gap-3 mb-2">
@@ -186,15 +192,11 @@ export default function Dashboard() {
         </button>
       </div>
 
-      {/* Content Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-
-        {/* Chart */}
         <div className="lg:col-span-1">
             <PortfolioChart assets={assets} />
         </div>
 
-        {/* List */}
         <div className="lg:col-span-2 bg-gray-900 border border-gray-800 rounded-2xl overflow-hidden shadow-xl">
             <div className="p-6 border-b border-gray-800 flex justify-between items-center">
                 <h2 className="text-xl font-bold">Your Portfolio</h2>
@@ -212,9 +214,12 @@ export default function Dashboard() {
                                 <div className="h-10 w-10 bg-gray-800 rounded-full flex items-center justify-center text-gray-400">
                                     <DollarSign className="h-5 w-5" />
                                 </div>
-                                <div>
-                                    <p className="font-bold text-white">{asset.name}</p>
-                                    <p className="text-xs text-gray-500 uppercase tracking-wide">{asset.type}</p>
+                                {/* Clicking the name or type opens history */}
+                                <div onClick={() => handleViewHistory(asset)} className="cursor-pointer group/item">
+                                    <p className="font-bold text-white group-hover/item:text-blue-400 transition-colors">{asset.name}</p>
+                                    <p className="text-xs text-gray-500 uppercase tracking-wide">
+                                      {asset.type} <span className="opacity-0 group-hover/item:opacity-100 ml-1 text-blue-500/50 text-[10px] uppercase font-bold tracking-tighter">(View History)</span>
+                                    </p>
                                 </div>
                             </div>
 
@@ -224,7 +229,6 @@ export default function Dashboard() {
                                     <p className="text-[10px] text-gray-500 italic">Last updated: {new Date(asset.lastUpdated).toLocaleTimeString()}</p>
                                 </div>
 
-                                {/* Refresh Button */}
                                 <button
                                     onClick={() => handleRefresh(asset.id)}
                                     disabled={refreshingId === asset.id}
@@ -234,7 +238,6 @@ export default function Dashboard() {
                                     <RefreshCw className="h-4 w-4" />
                                 </button>
 
-                                {/* Edit Button */}
                                 <button
                                     onClick={() => handleEdit(asset)}
                                     className="p-2 text-gray-600 hover:text-blue-400 hover:bg-blue-400/10 rounded-lg transition-all opacity-0 group-hover:opacity-100"
@@ -243,7 +246,6 @@ export default function Dashboard() {
                                     <Pencil className="h-4 w-4" />
                                 </button>
 
-                                {/* Delete Button */}
                                 <button
                                     onClick={() => handleDelete(asset.id)}
                                     className="p-2 text-gray-600 hover:text-red-400 hover:bg-red-400/10 rounded-lg transition-all opacity-0 group-hover:opacity-100"
@@ -264,6 +266,14 @@ export default function Dashboard() {
         onClose={handleCloseModal}
         onAssetAdded={fetchAssets}
         initialData={editingAsset}
+      />
+
+      {/* History Modal Integration */}
+      <HistoryModal
+        isOpen={isHistoryOpen}
+        onClose={() => setIsHistoryOpen(false)}
+        assetId={selectedAsset?.id || null}
+        assetName={selectedAsset?.name || ""}
       />
 
     </div>
