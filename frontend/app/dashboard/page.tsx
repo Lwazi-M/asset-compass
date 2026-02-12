@@ -1,10 +1,12 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import AddAssetModal from "./AddAssetModal";
+import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import axios from "axios";
-import { LogOut, User, Shield } from "lucide-react";
+import { LogOut, Shield, Plus, Wallet, TrendingUp, DollarSign } from "lucide-react";
 
+// Types
 interface UserData {
   id: number;
   email: string;
@@ -12,95 +14,181 @@ interface UserData {
   role: string;
 }
 
+interface Asset {
+  id: number;
+  name: string;
+  type: string;
+  value: number;
+  currency: string;
+  lastUpdated: string;
+}
+
 export default function Dashboard() {
   const router = useRouter();
   const [user, setUser] = useState<UserData | null>(null);
+  const [assets, setAssets] = useState<Asset[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isModalOpen, setIsModalOpen] = useState(false); // <--- New State
+
+  // Define fetchAssets outside useEffect so we can call it when an asset is added
+  const fetchAssets = useCallback(async () => {
+    const token = localStorage.getItem("token");
+    if (!token) return;
+
+    try {
+      const assetRes = await axios.get("/api/assets", {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      setAssets(assetRes.data);
+    } catch (err) {
+      console.error("Failed to refresh assets");
+    }
+  }, []);
 
   useEffect(() => {
     const token = localStorage.getItem("token");
 
-    // 1. If no token, kick them out immediately
     if (!token) {
       router.push("/");
       return;
     }
 
-    // 2. If token exists, ask the backend "Who am I?"
-    axios
-      .get("/api/me", {
-        headers: {
-          Authorization: `Bearer ${token}`, // Show the Badge!
-        },
-      })
-      .then((res) => {
-        setUser(res.data); // Save the user info
+    const init = async () => {
+      try {
+        // 1. Get User Data
+        const userRes = await axios.get("/api/me", {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        setUser(userRes.data);
+
+        // 2. Get Assets (using our reusable function)
+        await fetchAssets();
+
         setLoading(false);
-      })
-      .catch(() => {
-        // If the token is fake or expired, kick them out
+      } catch (err) {
+        // If anything fails, kick them out
         localStorage.removeItem("token");
         router.push("/");
-      });
-  }, [router]);
+      }
+    };
+
+    init();
+  }, [router, fetchAssets]);
 
   const handleLogout = () => {
-    localStorage.removeItem("token"); // Destroy the badge
-    router.push("/"); // Go to login
+    localStorage.removeItem("token");
+    router.push("/");
   };
 
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-950 flex items-center justify-center text-white">
-        Loading your dashboard...
+        <div className="animate-pulse flex flex-col items-center">
+          <Shield className="h-12 w-12 text-blue-600 mb-4" />
+          <p className="text-gray-400">Loading your portfolio...</p>
+        </div>
       </div>
     );
   }
 
+  // Calculate Total Net Worth
+  const totalValue = assets.reduce((sum, asset) => sum + asset.value, 0);
+
   return (
-    <div className="min-h-screen bg-gray-950 text-white p-8">
+    <div className="min-h-screen bg-gray-950 text-white p-6 md:p-10 relative">
+
       {/* Navbar */}
-      <nav className="flex justify-between items-center mb-12 border-b border-gray-800 pb-4">
-        <h1 className="text-2xl font-bold text-blue-500 flex items-center gap-2">
-          <Shield className="h-6 w-6" /> AssetCompass
-        </h1>
-        <button
-          onClick={handleLogout}
-          className="flex items-center gap-2 bg-red-500/10 hover:bg-red-500/20 text-red-400 px-4 py-2 rounded-lg transition-all"
-        >
-          <LogOut className="h-4 w-4" /> Sign Out
-        </button>
+      <nav className="flex justify-between items-center mb-10 border-b border-gray-800 pb-6">
+        <div className="flex items-center gap-3">
+            <div className="bg-blue-600/20 p-2 rounded-lg">
+                <Shield className="h-6 w-6 text-blue-500" />
+            </div>
+            <h1 className="text-2xl font-bold tracking-tight">AssetCompass</h1>
+        </div>
+        <div className="flex items-center gap-4">
+            <div className="text-right hidden md:block">
+                <p className="text-sm font-medium">{user?.fullName}</p>
+                <p className="text-xs text-gray-400">{user?.role}</p>
+            </div>
+            <button
+            onClick={handleLogout}
+            className="flex items-center gap-2 bg-red-500/10 hover:bg-red-500/20 text-red-400 px-4 py-2 rounded-lg transition-all text-sm font-medium"
+            >
+            <LogOut className="h-4 w-4" />
+            </button>
+        </div>
       </nav>
 
-      {/* Main Content */}
-      <div className="max-w-4xl mx-auto">
-        <div className="bg-gray-900 border border-gray-800 rounded-2xl p-8 shadow-xl">
-          <div className="flex items-center gap-4 mb-6">
-            <div className="h-16 w-16 bg-blue-600 rounded-full flex items-center justify-center text-2xl font-bold">
-              {user?.fullName.charAt(0)}
+      {/* Overview Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10">
+        <div className="bg-gradient-to-br from-blue-900/50 to-gray-900 border border-blue-500/30 p-6 rounded-2xl">
+            <div className="flex items-center gap-3 mb-2">
+                <Wallet className="h-5 w-5 text-blue-400" />
+                <h3 className="text-sm font-medium text-gray-300">Net Worth</h3>
             </div>
-            <div>
-              <h2 className="text-2xl font-bold">Welcome back, {user?.fullName}!</h2>
-              <p className="text-gray-400">{user?.email}</p>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-8">
-            <div className="bg-gray-950 p-4 rounded-xl border border-gray-800">
-              <p className="text-sm text-gray-500 mb-1">Role</p>
-              <p className="font-mono text-green-400">{user?.role}</p>
-            </div>
-            <div className="bg-gray-950 p-4 rounded-xl border border-gray-800">
-              <p className="text-sm text-gray-500 mb-1">User ID</p>
-              <p className="font-mono text-purple-400">#{user?.id}</p>
-            </div>
-            <div className="bg-gray-950 p-4 rounded-xl border border-gray-800">
-              <p className="text-sm text-gray-500 mb-1">Status</p>
-              <p className="font-mono text-blue-400">Active</p>
-            </div>
-          </div>
+            <p className="text-3xl font-bold text-white">${totalValue.toLocaleString()}</p>
         </div>
+
+        <div className="bg-gray-900 border border-gray-800 p-6 rounded-2xl">
+             <div className="flex items-center gap-3 mb-2">
+                <TrendingUp className="h-5 w-5 text-green-400" />
+                <h3 className="text-sm font-medium text-gray-300">Total Assets</h3>
+            </div>
+            <p className="text-3xl font-bold text-white">{assets.length}</p>
+        </div>
+
+        {/* Add New Asset Button - Now triggers the modal! */}
+        <button
+            onClick={() => setIsModalOpen(true)}
+            className="group bg-gray-900 border border-dashed border-gray-700 hover:border-blue-500 hover:bg-gray-800 p-6 rounded-2xl flex flex-col items-center justify-center transition-all cursor-pointer"
+        >
+            <div className="bg-blue-500/20 p-3 rounded-full mb-3 group-hover:bg-blue-500 group-hover:text-white transition-colors text-blue-400">
+                <Plus className="h-6 w-6" />
+            </div>
+            <span className="text-sm font-medium text-gray-400 group-hover:text-white">Add New Asset</span>
+        </button>
       </div>
+
+      {/* Asset List */}
+      <div className="bg-gray-900 border border-gray-800 rounded-2xl overflow-hidden shadow-xl">
+        <div className="p-6 border-b border-gray-800 flex justify-between items-center">
+            <h2 className="text-xl font-bold">Your Portfolio</h2>
+        </div>
+
+        {assets.length === 0 ? (
+            <div className="p-12 text-center text-gray-500">
+                You have no assets yet. Click "Add New Asset" to start tracking.
+            </div>
+        ) : (
+            <div className="divide-y divide-gray-800">
+                {assets.map((asset) => (
+                    <div key={asset.id} className="p-6 flex justify-between items-center hover:bg-gray-800/50 transition-colors">
+                        <div className="flex items-center gap-4">
+                            <div className="h-10 w-10 bg-gray-800 rounded-full flex items-center justify-center text-gray-400">
+                                <DollarSign className="h-5 w-5" />
+                            </div>
+                            <div>
+                                <p className="font-bold text-white">{asset.name}</p>
+                                <p className="text-xs text-gray-500 uppercase tracking-wide">{asset.type}</p>
+                            </div>
+                        </div>
+                        <div className="text-right">
+                            <p className="font-bold text-white text-lg">${asset.value.toLocaleString()}</p>
+                            <p className="text-xs text-gray-500">{asset.currency}</p>
+                        </div>
+                    </div>
+                ))}
+            </div>
+        )}
+      </div>
+
+      {/* The Modal Component */}
+      <AddAssetModal
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        onAssetAdded={fetchAssets} // Refresh list when done!
+      />
+
     </div>
   );
 }
