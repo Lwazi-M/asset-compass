@@ -4,7 +4,7 @@ import AddAssetModal from "./AddAssetModal";
 import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import axios from "axios";
-import { LogOut, Shield, Plus, Wallet, TrendingUp, DollarSign, Trash2, Pencil } from "lucide-react";
+import { LogOut, Shield, Plus, Wallet, TrendingUp, DollarSign, Trash2, Pencil, RefreshCw } from "lucide-react";
 import PortfolioChart from "./PortfolioChart";
 
 // Types
@@ -29,10 +29,11 @@ export default function Dashboard() {
   const [user, setUser] = useState<UserData | null>(null);
   const [assets, setAssets] = useState<Asset[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshingId, setRefreshingId] = useState<number | null>(null);
 
   // MODAL STATE
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [editingAsset, setEditingAsset] = useState<Asset | null>(null); // <--- Holds data for editing
+  const [editingAsset, setEditingAsset] = useState<Asset | null>(null);
 
   const fetchAssets = useCallback(async () => {
     const token = localStorage.getItem("token");
@@ -92,16 +93,30 @@ export default function Dashboard() {
     }
   };
 
-  // NEW: Open Modal in "Edit Mode"
-  const handleEdit = (asset: Asset) => {
-    setEditingAsset(asset); // Fill the modal with this asset's data
-    setIsModalOpen(true);   // Open the modal
+  // Handle Live Price Refresh
+  const handleRefresh = async (id: number) => {
+    setRefreshingId(id);
+    try {
+      const token = localStorage.getItem("token");
+      await axios.post(`/api/assets/${id}/refresh`, {}, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      await fetchAssets();
+    } catch (err) {
+      alert("Failed to fetch live price. Ensure the asset name starts with a valid ticker (e.g., BTC, TSLA).");
+    } finally {
+      setRefreshingId(null);
+    }
   };
 
-  // NEW: Reset state when closing
+  const handleEdit = (asset: Asset) => {
+    setEditingAsset(asset);
+    setIsModalOpen(true);
+  };
+
   const handleCloseModal = () => {
     setIsModalOpen(false);
-    setEditingAsset(null); // Clear editing data so "Add" is clean next time
+    setEditingAsset(null);
   };
 
   if (loading) {
@@ -115,7 +130,7 @@ export default function Dashboard() {
     );
   }
 
-  const totalValue = assets.reduce((sum, asset) => sum + asset.value, 0);
+  const totalValue = assets.reduce((sum, asset) => sum + Number(asset.value), 0);
 
   return (
     <div className="min-h-screen bg-gray-950 text-white p-6 md:p-10 relative">
@@ -149,7 +164,7 @@ export default function Dashboard() {
                 <Wallet className="h-5 w-5 text-blue-400" />
                 <h3 className="text-sm font-medium text-gray-300">Net Worth</h3>
             </div>
-            <p className="text-3xl font-bold text-white">${totalValue.toLocaleString()}</p>
+            <p className="text-3xl font-bold text-white">${totalValue.toLocaleString(undefined, { minimumFractionDigits: 2 })}</p>
         </div>
 
         <div className="bg-gray-900 border border-gray-800 p-6 rounded-2xl">
@@ -205,9 +220,19 @@ export default function Dashboard() {
 
                             <div className="flex items-center gap-2">
                                 <div className="text-right mr-4">
-                                    <p className="font-bold text-white text-lg">${asset.value.toLocaleString()}</p>
-                                    <p className="text-xs text-gray-500">{asset.currency}</p>
+                                    <p className="font-bold text-white text-lg">${Number(asset.value).toLocaleString(undefined, { minimumFractionDigits: 2 })}</p>
+                                    <p className="text-[10px] text-gray-500 italic">Last updated: {new Date(asset.lastUpdated).toLocaleTimeString()}</p>
                                 </div>
+
+                                {/* Refresh Button */}
+                                <button
+                                    onClick={() => handleRefresh(asset.id)}
+                                    disabled={refreshingId === asset.id}
+                                    className={`p-2 rounded-lg transition-all ${refreshingId === asset.id ? 'text-blue-500 animate-spin' : 'text-gray-600 hover:text-green-400 hover:bg-green-400/10 opacity-0 group-hover:opacity-100'}`}
+                                    title="Refresh Price"
+                                >
+                                    <RefreshCw className="h-4 w-4" />
+                                </button>
 
                                 {/* Edit Button */}
                                 <button
@@ -236,9 +261,9 @@ export default function Dashboard() {
 
       <AddAssetModal
         isOpen={isModalOpen}
-        onClose={handleCloseModal} // Use the new handler to clear state
+        onClose={handleCloseModal}
         onAssetAdded={fetchAssets}
-        initialData={editingAsset} // Pass the data to edit
+        initialData={editingAsset}
       />
 
     </div>
