@@ -44,30 +44,29 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
-                .cors(Customizer.withDefaults()) // <--- Enable CORS with our bean below
+                .cors(Customizer.withDefaults()) // Enable CORS using the bean below
                 .csrf(csrf -> csrf.disable())
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/api/auth/**").permitAll()
-                        .anyRequest().authenticated()
+                        .requestMatchers("/api/auth/**").permitAll() // Login/Verify is open
+                        .anyRequest().authenticated() // Everything else is locked
                 )
                 .sessionManagement(session -> session
-                        .sessionCreationPolicy(SessionCreationPolicy.STATELESS)
+                        .sessionCreationPolicy(SessionCreationPolicy.STATELESS) // No Cookies
                 )
                 .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
     }
 
-    // NEW: CORS Configuration Bean
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
 
-        // Add your production URLs here
+        // These origins must match your live deployment URLs exactly
         configuration.setAllowedOrigins(Arrays.asList(
                 "http://localhost:3000",
-                "https://asset-compass-production.up.railway.app", // Your Railway URL
-                "https://asset-compass.vercel.app"              // Your future Vercel URL
+                "https://asset-compass-production.up.railway.app",
+                "https://asset-compass-beta.vercel.app" // Your actual live frontend URL
         ));
 
         configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS"));
