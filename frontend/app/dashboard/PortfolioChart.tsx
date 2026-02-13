@@ -58,7 +58,7 @@ export default function PortfolioChart({ assets }: PortfolioChartProps) {
             <Tooltip
               contentStyle={{ backgroundColor: '#111827', borderColor: '#374151', borderRadius: '8px', color: '#fff' }}
               itemStyle={{ color: '#fff' }}
-              formatter={(value: number) => [`$${value.toLocaleString()}`, 'Value']}
+              formatter={(value: number | undefined) => [`$${value?.toLocaleString() ?? "0"}`, 'Value']}
             />
             <Legend
               verticalAlign="bottom"
