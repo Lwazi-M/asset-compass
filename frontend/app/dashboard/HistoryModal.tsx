@@ -28,7 +28,8 @@ export default function HistoryModal({ isOpen, onClose, assetId, assetName }: Hi
         setLoading(true);
         try {
           const token = localStorage.getItem("token");
-          const res = await axios.get(`/api/assets/${assetId}/history`, {
+          // Updated with Production URL for History Fetch
+          const res = await axios.get(`${process.env.NEXT_PUBLIC_API_URL}/api/assets/${assetId}/history`, {
             headers: { Authorization: `Bearer ${token}` },
           });
           setHistory(res.data);
@@ -47,8 +48,6 @@ export default function HistoryModal({ isOpen, onClose, assetId, assetName }: Hi
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in duration-200">
       <div className="w-full max-w-lg bg-gray-900 border border-gray-800 rounded-2xl shadow-2xl overflow-hidden">
-
-        {/* Header */}
         <div className="p-6 border-b border-gray-800 flex justify-between items-center bg-gray-900/50">
           <div className="flex items-center gap-3">
             <History className="h-5 w-5 text-blue-500" />
@@ -59,7 +58,6 @@ export default function HistoryModal({ isOpen, onClose, assetId, assetName }: Hi
           </button>
         </div>
 
-        {/* Content */}
         <div className="max-h-[60vh] overflow-y-auto p-4 custom-scrollbar">
           {loading ? (
             <div className="py-20 text-center text-gray-500 animate-pulse">Loading history...</div>
@@ -109,7 +107,6 @@ export default function HistoryModal({ isOpen, onClose, assetId, assetName }: Hi
           )}
         </div>
 
-        {/* Footer */}
         <div className="p-4 bg-gray-950/50 border-t border-gray-800 text-center text-[10px] text-gray-600 italic">
           Transactions are logged automatically during price refreshes and manual updates.
         </div>

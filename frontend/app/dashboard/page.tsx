@@ -1,7 +1,7 @@
 "use client";
 
 import AddAssetModal from "./AddAssetModal";
-import HistoryModal from "./HistoryModal"; //
+import HistoryModal from "./HistoryModal";
 import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import axios from "axios";
@@ -34,16 +34,17 @@ export default function Dashboard() {
 
   // MODAL STATE
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [isHistoryOpen, setIsHistoryOpen] = useState(false); //
+  const [isHistoryOpen, setIsHistoryOpen] = useState(false);
   const [editingAsset, setEditingAsset] = useState<Asset | null>(null);
-  const [selectedAsset, setSelectedAsset] = useState<Asset | null>(null); //
+  const [selectedAsset, setSelectedAsset] = useState<Asset | null>(null);
 
   const fetchAssets = useCallback(async () => {
     const token = localStorage.getItem("token");
     if (!token) return;
 
     try {
-      const assetRes = await axios.get("/api/assets", {
+      // Updated to use production API URL
+      const assetRes = await axios.get(`${process.env.NEXT_PUBLIC_API_URL}/api/assets`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       setAssets(assetRes.data);
@@ -62,7 +63,8 @@ export default function Dashboard() {
 
     const init = async () => {
       try {
-        const userRes = await axios.get("/api/me", {
+        // Updated to use production API URL
+        const userRes = await axios.get(`${process.env.NEXT_PUBLIC_API_URL}/api/me`, {
           headers: { Authorization: `Bearer ${token}` },
         });
         setUser(userRes.data);
@@ -87,7 +89,8 @@ export default function Dashboard() {
 
     try {
       const token = localStorage.getItem("token");
-      await axios.delete(`/api/assets/${id}`, {
+      // Updated to use production API URL
+      await axios.delete(`${process.env.NEXT_PUBLIC_API_URL}/api/assets/${id}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       fetchAssets();
@@ -100,7 +103,8 @@ export default function Dashboard() {
     setRefreshingId(id);
     try {
       const token = localStorage.getItem("token");
-      await axios.post(`/api/assets/${id}/refresh`, {}, {
+      // Updated to use production API URL
+      await axios.post(`${process.env.NEXT_PUBLIC_API_URL}/api/assets/${id}/refresh`, {}, {
         headers: { Authorization: `Bearer ${token}` },
       });
       await fetchAssets();
