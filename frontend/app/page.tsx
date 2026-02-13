@@ -37,26 +37,27 @@ export default function LoginPage() {
 
   // STEP 2: Send Code -> Get Token
   const handleVerify = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
-    setError("");
+      e.preventDefault();
+      setLoading(true);
+      setError("");
 
-    try {
-      const res = await axios.post("/api/auth/verify", { email, code });
-      const token = res.data.token;
+      try {
+        const res = await axios.post(`${process.env.NEXT_PUBLIC_API_URL}/api/auth/verify`, {
+            email,
+            code
+        });
 
-      // Save the VIP Badge!
-      localStorage.setItem("token", token);
+        localStorage.setItem("token", res.data.token);
 
-      // Step 3.4: Redirect to Dashboard 🚀
-      router.push("/dashboard");
+        // Redirect to Dashboard 🚀
+        router.push("/dashboard");
 
-    } catch (err) {
-      setError("Invalid code. Please check your email console.");
-    } finally {
-      setLoading(false);
-    }
-  };
+      } catch (err) {
+        setError("Invalid code. Please check your email console.");
+      } finally {
+        setLoading(false);
+      }
+    };
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-gray-950 text-white p-4">
