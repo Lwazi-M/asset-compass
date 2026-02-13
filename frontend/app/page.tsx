@@ -17,19 +17,22 @@ export default function LoginPage() {
 
   // STEP 1: Send Password -> Get Code
   const handleLogin = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
-    setError("");
+      e.preventDefault();
+      setLoading(true);
+      setError("");
 
-    try {
-      // We hit '/api/...' which Next.js forwards to port 8080
-      await axios.post("/api/auth/login", { email, password });
-      setStep("verify"); // Switch to Step 2
-    } catch (err) {
-      setError("Login failed. Check your credentials.");
-    } finally {
-      setLoading(false);
-    }
+      try {
+          // Change from "/api/auth/login" to the full production URL
+          await axios.post(`${process.env.NEXT_PUBLIC_API_URL}/api/auth/login`, {
+              email,
+              password
+          });
+          setStep("verify");
+      } catch (err: any) {
+          setError("Login failed. Check your credentials.");
+      } finally {
+          setLoading(false);
+      }
   };
 
   // STEP 2: Send Code -> Get Token
