@@ -43,7 +43,6 @@ export default function Dashboard() {
     if (!token) return;
 
     try {
-      // Updated to use production API URL
       const assetRes = await axios.get(`${process.env.NEXT_PUBLIC_API_URL}/api/assets`, {
         headers: { Authorization: `Bearer ${token}` },
       });
@@ -63,7 +62,6 @@ export default function Dashboard() {
 
     const init = async () => {
       try {
-        // Updated to use production API URL
         const userRes = await axios.get(`${process.env.NEXT_PUBLIC_API_URL}/api/me`, {
           headers: { Authorization: `Bearer ${token}` },
         });
@@ -89,7 +87,6 @@ export default function Dashboard() {
 
     try {
       const token = localStorage.getItem("token");
-      // Updated to use production API URL
       await axios.delete(`${process.env.NEXT_PUBLIC_API_URL}/api/assets/${id}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
@@ -103,7 +100,6 @@ export default function Dashboard() {
     setRefreshingId(id);
     try {
       const token = localStorage.getItem("token");
-      // Updated to use production API URL
       await axios.post(`${process.env.NEXT_PUBLIC_API_URL}/api/assets/${id}/refresh`, {}, {
         headers: { Authorization: `Bearer ${token}` },
       });
@@ -120,7 +116,6 @@ export default function Dashboard() {
     setIsModalOpen(true);
   };
 
-  // Open history modal
   const handleViewHistory = (asset: Asset) => {
     setSelectedAsset(asset);
     setIsHistoryOpen(true);
@@ -174,7 +169,8 @@ export default function Dashboard() {
                 <Wallet className="h-5 w-5 text-blue-400" />
                 <h3 className="text-sm font-medium text-gray-300">Net Worth</h3>
             </div>
-            <p className="text-3xl font-bold text-white">${totalValue.toLocaleString(undefined, { minimumFractionDigits: 2 })}</p>
+            {/* UPDATED: Changed hardcoded $ to R for Net Worth */}
+            <p className="text-3xl font-bold text-white">R{totalValue.toLocaleString(undefined, { minimumFractionDigits: 2 })}</p>
         </div>
 
         <div className="bg-gray-900 border border-gray-800 p-6 rounded-2xl">
@@ -213,12 +209,11 @@ export default function Dashboard() {
             ) : (
                 <div className="divide-y divide-gray-800">
                     {assets.map((asset) => (
-                        <div key={asset.id} className="p-6 flex justify-between items-center hover:bg-gray-800/50 transition-colors group">
+                        <div key={asset.id} className="p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4 hover:bg-gray-800/50 transition-colors group">
                             <div className="flex items-center gap-4">
                                 <div className="h-10 w-10 bg-gray-800 rounded-full flex items-center justify-center text-gray-400">
                                     <DollarSign className="h-5 w-5" />
                                 </div>
-                                {/* Clicking the name or type opens history */}
                                 <div onClick={() => handleViewHistory(asset)} className="cursor-pointer group/item">
                                     <p className="font-bold text-white group-hover/item:text-blue-400 transition-colors">{asset.name}</p>
                                     <p className="text-xs text-gray-500 uppercase tracking-wide">
@@ -227,16 +222,20 @@ export default function Dashboard() {
                                 </div>
                             </div>
 
-                            <div className="flex items-center gap-2">
+                            <div className="flex items-center gap-2 justify-end">
                                 <div className="text-right mr-4">
-                                    <p className="font-bold text-white text-lg">${Number(asset.value).toLocaleString(undefined, { minimumFractionDigits: 2 })}</p>
+                                    {/* UPDATED: Dynamic Currency Symbol */}
+                                    <p className="font-bold text-white text-lg">
+                                        {asset.currency === 'ZAR' ? 'R' : '$'}{Number(asset.value).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                                    </p>
                                     <p className="text-[10px] text-gray-500 italic">Last updated: {new Date(asset.lastUpdated).toLocaleTimeString()}</p>
                                 </div>
 
+                                {/* UPDATED: Buttons are now always visible (opacity removed) */}
                                 <button
                                     onClick={() => handleRefresh(asset.id)}
                                     disabled={refreshingId === asset.id}
-                                    className={`p-2 rounded-lg transition-all ${refreshingId === asset.id ? 'text-blue-500 animate-spin' : 'text-gray-600 hover:text-green-400 hover:bg-green-400/10 opacity-0 group-hover:opacity-100'}`}
+                                    className={`p-2 rounded-lg transition-all ${refreshingId === asset.id ? 'text-blue-500 animate-spin' : 'text-gray-500 hover:text-green-400 hover:bg-green-400/10'}`}
                                     title="Refresh Price"
                                 >
                                     <RefreshCw className="h-4 w-4" />
@@ -244,7 +243,7 @@ export default function Dashboard() {
 
                                 <button
                                     onClick={() => handleEdit(asset)}
-                                    className="p-2 text-gray-600 hover:text-blue-400 hover:bg-blue-400/10 rounded-lg transition-all opacity-0 group-hover:opacity-100"
+                                    className="p-2 text-gray-500 hover:text-blue-400 hover:bg-blue-400/10 rounded-lg transition-all"
                                     title="Edit Asset"
                                 >
                                     <Pencil className="h-4 w-4" />
@@ -252,7 +251,7 @@ export default function Dashboard() {
 
                                 <button
                                     onClick={() => handleDelete(asset.id)}
-                                    className="p-2 text-gray-600 hover:text-red-400 hover:bg-red-400/10 rounded-lg transition-all opacity-0 group-hover:opacity-100"
+                                    className="p-2 text-gray-500 hover:text-red-400 hover:bg-red-400/10 rounded-lg transition-all"
                                     title="Delete Asset"
                                 >
                                     <Trash2 className="h-4 w-4" />
@@ -272,12 +271,12 @@ export default function Dashboard() {
         initialData={editingAsset}
       />
 
-      {/* History Modal Integration */}
       <HistoryModal
-        isOpen={isHistoryOpen}
-        onClose={() => setIsHistoryOpen(false)}
-        assetId={selectedAsset?.id || null}
-        assetName={selectedAsset?.name || ""}
+          isOpen={isHistoryOpen}
+          onClose={() => setIsHistoryOpen(false)}
+          assetId={selectedAsset?.id || null}
+          assetName={selectedAsset?.name || ""}
+          assetCurrency={selectedAsset?.currency || "USD"}
       />
 
     </div>
