@@ -24,7 +24,7 @@ interface HistoryModalProps {
   onClose: () => void;
   assetId: number | null;
   assetName: string;
-  assetCurrency?: string; // New prop for currency
+  assetCurrency?: string;
 }
 
 export default function HistoryModal({
@@ -47,7 +47,6 @@ export default function HistoryModal({
             headers: { Authorization: `Bearer ${token}` },
           });
 
-          // Sort explicitly by date (Oldest -> Newest) for the chart
           const sortedData = res.data.sort((a: Transaction, b: Transaction) =>
             new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
           );
@@ -62,7 +61,6 @@ export default function HistoryModal({
     }
   }, [isOpen, assetId]);
 
-  // Prepare data for the chart
   const chartData = useMemo(() => {
     return history.map((item) => ({
       date: new Date(item.timestamp).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }),
@@ -73,11 +71,10 @@ export default function HistoryModal({
 
   if (!isOpen) return null;
 
-  // Determine chart color (Green for profit, Red for loss based on first vs last data point)
   const startValue = history.length > 0 ? history[0].valueAtTime : 0;
   const endValue = history.length > 0 ? history[history.length - 1].valueAtTime : 0;
   const isPositive = endValue >= startValue;
-  const chartColor = isPositive ? "#10B981" : "#EF4444"; // Emerald-500 or Red-500
+  const chartColor = isPositive ? "#10B981" : "#EF4444";
   const currencySymbol = assetCurrency === "ZAR" ? "R" : "$";
 
   return (
@@ -119,7 +116,8 @@ export default function HistoryModal({
                         <Tooltip
                             contentStyle={{ backgroundColor: '#111827', borderColor: '#374151', borderRadius: '8px', color: '#fff' }}
                             itemStyle={{ color: '#fff' }}
-                            formatter={(value: number) => [`${currencySymbol}${value.toLocaleString()}`, "Value"]}
+                            // FIXED: Using 'any' type to silence strict TypeScript check
+                            formatter={(value: any) => [`${currencySymbol}${Number(value).toLocaleString()}`, "Value"]}
                             labelStyle={{ color: '#9CA3AF', marginBottom: '0.5rem' }}
                         />
                         <XAxis dataKey="date" hide />
@@ -147,8 +145,7 @@ export default function HistoryModal({
             <div className="py-10 text-center text-gray-500">No transaction logs found.</div>
           ) : (
             <div className="space-y-3">
-              {/* Reverse the array for the list so newest is at top */}
-              {[...history].reverse().map((log, index) => {
+              {[...history].reverse().map((log) => {
                 return (
                   <div key={log.id} className="bg-gray-900 border border-gray-800 p-4 rounded-xl flex justify-between items-center hover:border-gray-700 transition-colors">
                     <div className="flex items-center gap-4">
