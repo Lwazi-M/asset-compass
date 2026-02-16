@@ -15,27 +15,35 @@ public class StockService {
 
     private final RestTemplate restTemplate = new RestTemplate();
 
+    // 1. Get Live Price (Existing)
     public BigDecimal getStockPrice(String ticker) {
-        // Prepare the API URL
         String url = "https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=" + ticker + "&apikey=" + apiKey;
 
         try {
-            // Fetch JSON
             String response = restTemplate.getForObject(url, String.class);
             ObjectMapper mapper = new ObjectMapper();
             JsonNode root = mapper.readTree(response);
 
-            // Extract "05. price" from the "Global Quote" object
             JsonNode quote = root.path("Global Quote");
             if (quote.has("05. price")) {
                 String priceString = quote.get("05. price").asText();
-                return new BigDecimal(priceString); // Return e.g., 255.50
+                return new BigDecimal(priceString);
             }
         } catch (Exception e) {
             System.err.println("Failed to fetch stock price for " + ticker + ": " + e.getMessage());
         }
-
-        // If API fails, return null (Controller will handle the error)
         return null;
+    }
+
+    // 2. NEW: Search for Stocks (e.g. "Take-Two" -> "TTWO")
+    public String searchStocks(String query) {
+        String url = "https://www.alphavantage.co/query?function=SYMBOL_SEARCH&keywords=" + query + "&apikey=" + apiKey;
+        try {
+            // We return the raw JSON string so the frontend can parse the list of matches
+            return restTemplate.getForObject(url, String.class);
+        } catch (Exception e) {
+            System.err.println("Search failed: " + e.getMessage());
+            return "{\"bestMatches\": []}"; // Return empty list on error
+        }
     }
 }

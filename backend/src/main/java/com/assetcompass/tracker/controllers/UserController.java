@@ -1,42 +1,73 @@
 package com.assetcompass.tracker.controllers;
 
 import com.assetcompass.tracker.models.AppUser;
+import com.assetcompass.tracker.models.Asset;
 import com.assetcompass.tracker.repositories.AppUserRepository;
+import com.assetcompass.tracker.repositories.AssetRepository;
+import com.assetcompass.tracker.services.CurrencyService;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-import java.util.Optional;
+import java.math.BigDecimal;
+import java.util.List;
+import java.util.Map;
 
-@RestController // This tells Spring: "I speak JSON, not HTML"
-@RequestMapping("/api") // All addresses here start with /api
+@RestController
+@RequestMapping("/api")
 public class UserController {
 
     private final AppUserRepository userRepository;
+    private final AssetRepository assetRepository;
+    private final CurrencyService currencyService;
 
-    public UserController(AppUserRepository userRepository) {
+    // Inject repositories and services
+    public UserController(AppUserRepository userRepository,
+                          AssetRepository assetRepository,
+                          CurrencyService currencyService) {
         this.userRepository = userRepository;
+        this.assetRepository = assetRepository;
+        this.currencyService = currencyService;
     }
 
     @GetMapping("/me")
-    public com.assetcompass.tracker.dtos.UserDTO getCurrentUser() { // Return type changed to UserDTO
-        // 1. Get the logged-in user's email
+    public Map<String, Object> getCurrentUser() {
+        // 1. Get Logged-in User
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
         String email = auth.getName();
 
-        // 2. Get the raw user from DB
-        AppUser appUser = userRepository.findByEmail(email)
+        AppUser user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new RuntimeException("User not found"));
 
-        // 3. Convert to Safe DTO (Manual Mapping)
-        com.assetcompass.tracker.dtos.UserDTO safeUser = new com.assetcompass.tracker.dtos.UserDTO();
-        safeUser.setId(appUser.getId());
-        safeUser.setEmail(appUser.getEmail());
-        safeUser.setFullName(appUser.getFullName());
-        safeUser.setRole(appUser.getRole());
+        // 2. Calculate Net Worth Dynamically
+        List<Asset> assets = assetRepository.findByUserId(user.getId());
 
-        return safeUser; // Send the safe version!
+        BigDecimal netWorthZAR = BigDecimal.ZERO;
+        BigDecimal usdRate = currencyService.getUsdToZarRate(); // Fetch live rate (e.g., 18.25)
+
+        for (Asset asset : assets) {
+            // Calculate Asset Value: Quantity * Buy Price
+            BigDecimal assetValue = asset.getQuantity().multiply(asset.getBuyPrice());
+
+            // Convert to ZAR if the asset is in USD
+            if ("USD".equalsIgnoreCase(asset.getCurrency())) {
+                netWorthZAR = netWorthZAR.add(assetValue.multiply(usdRate));
+            } else {
+                // If it's already ZAR (future feature), just add it
+                netWorthZAR = netWorthZAR.add(assetValue);
+            }
+        }
+
+        // 3. Return User Data + Calculated Net Worth
+        return Map.of(
+                "id", user.getId(),
+                "email", user.getEmail(),
+                "fullName", user.getFullName(),
+                "role", user.getRole(),
+                "netWorthZAR", netWorthZAR, // This fixes the "R0.00" issue!
+                "exchangeRate", usdRate
+        );
     }
 }
