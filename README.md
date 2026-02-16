@@ -137,6 +137,7 @@ To deploy this app, you need to set the following environment variables in your 
 | `SPRING_DATASOURCE_USERNAME` | Database Username | **Backend (Railway)** |
 | `SPRING_DATASOURCE_PASSWORD` | Database Password | **Backend (Railway)** |
 | `APP_ALPHAVANTAGE_KEY` | AlphaVantage API Key for stock data | **Backend (Railway)** |
+| `RESEND_API_KEY` | Resend API key Token | **Backend (Railway)** |
 
 ### **📄 License**
 Distributed under the MIT License. See LICENSE for more information.
