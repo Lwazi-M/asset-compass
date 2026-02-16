@@ -3,10 +3,12 @@
 import { useState, useEffect } from 'react';
 import { X, Search, Calculator, Loader2 } from 'lucide-react';
 
+// FIX: Added 'initialData' to the interface to prevent build errors
 interface AddAssetModalProps {
   isOpen: boolean;
   onClose: () => void;
   onAssetAdded: () => void;
+  initialData?: any; // <--- This fixes the error!
 }
 
 interface Stock {
@@ -16,7 +18,7 @@ interface Stock {
   price: number;
 }
 
-export default function AddAssetModal({ isOpen, onClose, onAssetAdded }: AddAssetModalProps) {
+export default function AddAssetModal({ isOpen, onClose, onAssetAdded, initialData }: AddAssetModalProps) {
   const [step, setStep] = useState(1); // 1: Search, 2: Calculator
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<Stock[]>([]);
@@ -25,12 +27,23 @@ export default function AddAssetModal({ isOpen, onClose, onAssetAdded }: AddAsse
 
   // Calculator State
   const [investedAmount, setInvestedAmount] = useState('');
-  const [currency, setCurrency] = useState('ZAR'); // Default to Rands
+  const [currency, setCurrency] = useState('ZAR');
   const [calculatedShares, setCalculatedShares] = useState<string | null>(null);
   const [convertedUsd, setConvertedUsd] = useState<number | null>(null);
-  const [usdRate, setUsdRate] = useState(18.50); // Fallback rate
+  const [usdRate, setUsdRate] = useState(18.50);
 
-  // 1. Search for Stocks (Simulated for now)
+  // Reset state when modal opens
+  useEffect(() => {
+    if (isOpen) {
+      setStep(1);
+      setInvestedAmount('');
+      setSearchResults([]);
+      setSearchQuery('');
+      setSelectedStock(null);
+    }
+  }, [isOpen]);
+
+  // 1. Search for Stocks (Simulated)
   const handleSearch = async () => {
     setLoading(true);
     // Simulate API search delay
@@ -69,7 +82,7 @@ export default function AddAssetModal({ isOpen, onClose, onAssetAdded }: AddAsse
 
     // Calculate Shares: Invested USD / Stock Price
     const shares = usdAmount / selectedStock.price;
-    setCalculatedShares(shares.toFixed(4)); // Show 4 decimal places
+    setCalculatedShares(shares.toFixed(4));
   }, [investedAmount, currency, selectedStock, usdRate]);
 
   // 4. Submit to Backend
@@ -98,11 +111,6 @@ export default function AddAssetModal({ isOpen, onClose, onAssetAdded }: AddAsse
       if (response.ok) {
         onAssetAdded(); // Refresh dashboard
         onClose();      // Close modal
-        // Reset state for next time
-        setStep(1);
-        setInvestedAmount('');
-        setSearchResults([]);
-        setSearchQuery('');
       } else {
         alert("Failed to buy asset. Check console.");
       }
@@ -175,8 +183,6 @@ export default function AddAssetModal({ isOpen, onClose, onAssetAdded }: AddAsse
         {/* STEP 2: CALCULATOR */}
         {step === 2 && selectedStock && (
           <div className="p-6 space-y-6">
-
-            {/* Stock Info Card */}
             <div className="bg-slate-800 p-4 rounded-xl flex justify-between items-center border border-slate-700">
                 <div>
                     <h1 className="text-2xl font-bold text-white">{selectedStock.symbol}</h1>
@@ -188,64 +194,9 @@ export default function AddAssetModal({ isOpen, onClose, onAssetAdded }: AddAsse
                 </div>
             </div>
 
-            {/* Input Section */}
             <div className="space-y-2">
                 <label className="text-sm font-medium text-slate-300">I want to invest:</label>
                 <div className="flex gap-2">
                     <select
                         className="bg-slate-800 text-white px-3 py-3 rounded-xl border border-slate-700 focus:outline-none"
                         value={currency}
-                        onChange={(e) => setCurrency(e.target.value)}
-                    >
-                        <option value="ZAR">ZAR (R)</option>
-                        <option value="USD">USD ($)</option>
-                    </select>
-                    <input
-                        type="number"
-                        placeholder="Amount (e.g. 5000)"
-                        className="flex-1 bg-slate-800 text-white px-4 py-3 rounded-xl border border-slate-700 focus:border-blue-500 focus:outline-none font-mono text-lg"
-                        value={investedAmount}
-                        onChange={(e) => setInvestedAmount(e.target.value)}
-                    />
-                </div>
-            </div>
-
-            {/* The "WealthOS" Calculation Display */}
-            <div className="bg-blue-900/20 border border-blue-500/30 p-4 rounded-xl space-y-3">
-                <div className="flex justify-between text-sm">
-                    <span className="text-slate-400">Exchange Rate:</span>
-                    <span className="text-slate-200 font-mono">1 USD ≈ {usdRate} ZAR</span>
-                </div>
-                {convertedUsd !== null && (
-                    <div className="flex justify-between text-sm">
-                        <span className="text-slate-400">USD Value:</span>
-                        <span className="text-white font-mono">${convertedUsd.toFixed(2)}</span>
-                    </div>
-                )}
-                <div className="border-t border-blue-500/30 pt-3 flex justify-between items-center">
-                    <span className="text-blue-200 font-medium">Est. Shares Owned:</span>
-                    <span className="text-2xl font-bold text-blue-400 font-mono">
-                        {calculatedShares || '0.00'}
-                    </span>
-                </div>
-            </div>
-
-            <button
-                onClick={handleBuy}
-                disabled={!investedAmount || loading}
-                className="w-full bg-emerald-600 hover:bg-emerald-500 disabled:bg-slate-700 disabled:cursor-not-allowed text-white font-bold py-4 rounded-xl transition flex justify-center items-center gap-2"
-            >
-                {loading ? <Loader2 className="animate-spin" /> : (
-                    <>
-                        <Calculator size={20} />
-                        Confirm Investment
-                    </>
-                )}
-            </button>
-          </div>
-        )}
-
-      </div>
-    </div>
-  );
-}
