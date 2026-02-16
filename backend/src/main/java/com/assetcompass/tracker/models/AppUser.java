@@ -6,6 +6,7 @@ import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
 
+import java.time.LocalDateTime;
 import java.util.Collection;
 import java.util.Collections;
 
@@ -31,10 +32,14 @@ public class AppUser implements UserDetails {
 
     private String role; // e.g., "USER", "ADMIN"
 
+    // --- VERIFICATION FIELDS ---
     @Column(name = "verification_code")
     private String verificationCode;
 
-    // --- FIX: Add @Builder.Default to respect the 'false' value ---
+    // FIX: Restored this field so AuthService can compile successfully
+    @Column(name = "verification_expires_at")
+    private LocalDateTime verificationCodeExpiresAt;
+
     @Builder.Default
     @Column(name = "is_enabled")
     private boolean isEnabled = false;
