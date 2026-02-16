@@ -3,12 +3,11 @@
 import { useState, useEffect } from 'react';
 import { X, Search, Calculator, Loader2 } from 'lucide-react';
 
-// FIX: Added 'initialData' to the interface to prevent build errors
 interface AddAssetModalProps {
   isOpen: boolean;
   onClose: () => void;
   onAssetAdded: () => void;
-  initialData?: any; // <--- This fixes the error!
+  initialData?: any; // Added to fix the build error
 }
 
 interface Stock {
@@ -200,3 +199,56 @@ export default function AddAssetModal({ isOpen, onClose, onAssetAdded, initialDa
                     <select
                         className="bg-slate-800 text-white px-3 py-3 rounded-xl border border-slate-700 focus:outline-none"
                         value={currency}
+                        onChange={(e) => setCurrency(e.target.value)}
+                    >
+                        <option value="ZAR">ZAR (R)</option>
+                        <option value="USD">USD ($)</option>
+                    </select>
+                    <input
+                        type="number"
+                        placeholder="Amount (e.g. 5000)"
+                        className="flex-1 bg-slate-800 text-white px-4 py-3 rounded-xl border border-slate-700 focus:border-blue-500 focus:outline-none font-mono text-lg"
+                        value={investedAmount}
+                        onChange={(e) => setInvestedAmount(e.target.value)}
+                    />
+                </div>
+            </div>
+
+            <div className="bg-blue-900/20 border border-blue-500/30 p-4 rounded-xl space-y-3">
+                <div className="flex justify-between text-sm">
+                    <span className="text-slate-400">Exchange Rate:</span>
+                    <span className="text-slate-200 font-mono">1 USD ≈ {usdRate} ZAR</span>
+                </div>
+                {convertedUsd !== null && (
+                    <div className="flex justify-between text-sm">
+                        <span className="text-slate-400">USD Value:</span>
+                        <span className="text-white font-mono">${convertedUsd.toFixed(2)}</span>
+                    </div>
+                )}
+                <div className="border-t border-blue-500/30 pt-3 flex justify-between items-center">
+                    <span className="text-blue-200 font-medium">Est. Shares Owned:</span>
+                    <span className="text-2xl font-bold text-blue-400 font-mono">
+                        {calculatedShares || '0.00'}
+                    </span>
+                </div>
+            </div>
+
+            <button
+                onClick={handleBuy}
+                disabled={!investedAmount || loading}
+                className="w-full bg-emerald-600 hover:bg-emerald-500 disabled:bg-slate-700 disabled:cursor-not-allowed text-white font-bold py-4 rounded-xl transition flex justify-center items-center gap-2"
+            >
+                {loading ? <Loader2 className="animate-spin" /> : (
+                    <>
+                        <Calculator size={20} />
+                        Confirm Investment
+                    </>
+                )}
+            </button>
+          </div>
+        )}
+
+      </div>
+    </div>
+  );
+}
