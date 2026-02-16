@@ -1,283 +1,305 @@
-"use client";
+'use client';
 
-import AddAssetModal from "./AddAssetModal";
-import HistoryModal from "./HistoryModal";
-import { useEffect, useState, useCallback } from "react";
-import { useRouter } from "next/navigation";
-import axios from "axios";
-import { LogOut, Shield, Plus, Wallet, TrendingUp, DollarSign, Trash2, Pencil, RefreshCw } from "lucide-react";
-import PortfolioChart from "./PortfolioChart";
+import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { LogOut, Plus, Wallet, TrendingUp, RefreshCw, Trash2, Edit2, PieChart } from 'lucide-react';
+import AddAssetModal from './AddAssetModal';
+import HistoryModal from './HistoryModal';
+import PortfolioChart from './PortfolioChart';
 
-// Types
-interface UserData {
-  id: number;
-  email: string;
-  fullName: string;
-  role: string;
-}
-
+// Define the new "WealthOS" data structure
 interface Asset {
   id: number;
   name: string;
-  type: string;
-  value: number;
+  ticker: string;
+  assetType: string;
+  quantity: number;   // New Field
+  buyPrice: number;   // New Field
   currency: string;
   lastUpdated: string;
 }
 
+interface User {
+  fullName: string;
+  email: string;
+  role: string;
+  netWorthZAR?: number; // Backend now calculates this
+}
+
 export default function Dashboard() {
   const router = useRouter();
-  const [user, setUser] = useState<UserData | null>(null);
+  const [user, setUser] = useState<User | null>(null);
   const [assets, setAssets] = useState<Asset[]>([]);
   const [loading, setLoading] = useState(true);
-  const [refreshingId, setRefreshingId] = useState<number | null>(null);
+  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
 
-  // MODAL STATE
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [isHistoryOpen, setIsHistoryOpen] = useState(false);
-  const [editingAsset, setEditingAsset] = useState<Asset | null>(null);
+  // History Modal State
   const [selectedAsset, setSelectedAsset] = useState<Asset | null>(null);
+  const [isHistoryOpen, setIsHistoryOpen] = useState(false);
 
-  const fetchAssets = useCallback(async () => {
-    const token = localStorage.getItem("token");
-    if (!token) return;
-
-    try {
-      const assetRes = await axios.get(`${process.env.NEXT_PUBLIC_API_URL}/api/assets`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      setAssets(assetRes.data);
-    } catch (err) {
-      console.error("Failed to refresh assets");
-    }
-  }, []);
+  // Edit State
+  const [editingAsset, setEditingAsset] = useState<Asset | null>(null);
 
   useEffect(() => {
-    const token = localStorage.getItem("token");
+    fetchData();
+  }, []);
 
+  const fetchData = async () => {
+    const token = localStorage.getItem('token');
     if (!token) {
-      router.push("/");
+      router.push('/login');
       return;
     }
 
-    const init = async () => {
-      try {
-        const userRes = await axios.get(`${process.env.NEXT_PUBLIC_API_URL}/api/me`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        setUser(userRes.data);
-        await fetchAssets();
-        setLoading(false);
-      } catch (err) {
-        localStorage.removeItem("token");
-        router.push("/");
-      }
-    };
+    try {
+      // 1. Fetch User (Now includes Net Worth in ZAR)
+      const userRes = await fetch('https://asset-compass-production.up.railway.app/api/me', {
+        headers: { Authorization: `Bearer ${token}` },
+      });
 
-    init();
-  }, [router, fetchAssets]);
+      if (!userRes.ok) throw new Error('Failed to fetch user');
+      const userData = await userRes.json();
+      setUser(userData);
+
+      // 2. Fetch Assets
+      const assetRes = await fetch('https://asset-compass-production.up.railway.app/api/assets', {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      if (assetRes.ok) {
+        const assetData = await assetRes.json();
+        setAssets(assetData);
+      }
+    } catch (err) {
+      console.error(err);
+      localStorage.removeItem('token');
+      router.push('/login');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleLogout = () => {
-    localStorage.removeItem("token");
-    router.push("/");
+    localStorage.removeItem('token');
+    router.push('/login');
   };
 
   const handleDelete = async (id: number) => {
-    if (!confirm("Are you sure you want to delete this asset?")) return;
+    if(!confirm("Are you sure you want to delete this asset?")) return;
 
+    const token = localStorage.getItem('token');
     try {
-      const token = localStorage.getItem("token");
-      await axios.delete(`${process.env.NEXT_PUBLIC_API_URL}/api/assets/${id}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      fetchAssets();
+        await fetch(`https://asset-compass-production.up.railway.app/api/assets/${id}`, {
+            method: 'DELETE',
+            headers: { Authorization: `Bearer ${token}` }
+        });
+        fetchAssets(); // Refresh list
     } catch (err) {
-      alert("Failed to delete asset.");
+        console.error("Failed to delete", err);
     }
   };
 
-  const handleRefresh = async (id: number) => {
-    setRefreshingId(id);
-    try {
-      const token = localStorage.getItem("token");
-      await axios.post(`${process.env.NEXT_PUBLIC_API_URL}/api/assets/${id}/refresh`, {}, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      await fetchAssets();
-    } catch (err) {
-      alert("Failed to fetch live price. Ensure the asset name starts with a valid ticker (e.g., BTC, TSLA).");
-    } finally {
-      setRefreshingId(null);
+  // Re-fetch assets only
+  const fetchAssets = async () => {
+    const token = localStorage.getItem('token');
+    const res = await fetch('https://asset-compass-production.up.railway.app/api/assets', {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (res.ok) {
+      setAssets(await res.json());
+      // Also refresh user to update Net Worth
+      fetchData();
     }
   };
 
-  const handleEdit = (asset: Asset) => {
-    setEditingAsset(asset);
-    setIsModalOpen(true);
-  };
-
-  const handleViewHistory = (asset: Asset) => {
+  const openHistory = (asset: Asset) => {
     setSelectedAsset(asset);
     setIsHistoryOpen(true);
   };
 
-  const handleCloseModal = () => {
-    setIsModalOpen(false);
-    setEditingAsset(null);
+  const handleEdit = (asset: Asset) => {
+    setEditingAsset(asset);
+    setIsAddModalOpen(true);
   };
 
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-gray-950 flex items-center justify-center text-white">
-        <div className="animate-pulse flex flex-col items-center">
-          <Shield className="h-12 w-12 text-blue-600 mb-4" />
-          <p className="text-gray-400">Loading your portfolio...</p>
-        </div>
-      </div>
-    );
-  }
+  const handleCloseModal = () => {
+    setIsAddModalOpen(false);
+    setEditingAsset(null); // Clear editing state
+  };
 
-  const totalValue = assets.reduce((sum, asset) => sum + Number(asset.value), 0);
+  if (loading) return <div className="flex h-screen items-center justify-center bg-slate-950 text-white">Loading WealthOS...</div>;
 
   return (
-    <div className="min-h-screen bg-gray-950 text-white p-6 md:p-10 relative">
+    <div className="min-h-screen bg-slate-950 text-slate-100 font-sans selection:bg-blue-500/30">
 
-      <nav className="flex justify-between items-center mb-10 border-b border-gray-800 pb-6">
-        <div className="flex items-center gap-3">
-            <div className="bg-blue-600/20 p-2 rounded-lg">
-                <Shield className="h-6 w-6 text-blue-500" />
+      {/* Navbar */}
+      <nav className="border-b border-slate-800 bg-slate-900/50 backdrop-blur-md sticky top-0 z-30">
+        <div className="max-w-7xl mx-auto px-6 h-20 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="bg-blue-600 p-2 rounded-xl shadow-lg shadow-blue-900/20">
+              <TrendingUp className="text-white h-6 w-6" />
             </div>
-            <h1 className="text-2xl font-bold tracking-tight">AssetCompass</h1>
-        </div>
-        <div className="flex items-center gap-4">
-            <div className="text-right hidden md:block">
-                <p className="text-sm font-medium">{user?.fullName}</p>
-                <p className="text-xs text-gray-400">{user?.role}</p>
+            <span className="text-2xl font-bold bg-gradient-to-r from-white to-slate-400 bg-clip-text text-transparent">
+              AssetCompass
+            </span>
+          </div>
+          <div className="flex items-center gap-6">
+            <div className="text-right hidden sm:block">
+              <p className="text-sm text-slate-400">Welcome back,</p>
+              <p className="text-sm font-semibold text-white">{user?.fullName}</p>
             </div>
             <button
-            onClick={handleLogout}
-            className="flex items-center gap-2 bg-red-500/10 hover:bg-red-500/20 text-red-400 px-4 py-2 rounded-lg transition-all text-sm font-medium"
+              onClick={handleLogout}
+              className="flex items-center gap-2 bg-slate-800 hover:bg-red-500/10 hover:text-red-400 text-slate-300 px-4 py-2 rounded-lg transition-all duration-300 border border-slate-700 hover:border-red-500/50"
             >
-            <LogOut className="h-4 w-4" />
+              <LogOut size={18} />
+              <span className="hidden sm:inline">Sign Out</span>
             </button>
+          </div>
         </div>
       </nav>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10">
-        <div className="bg-gradient-to-br from-blue-900/50 to-gray-900 border border-blue-500/30 p-6 rounded-2xl">
-            <div className="flex items-center gap-3 mb-2">
-                <Wallet className="h-5 w-5 text-blue-400" />
-                <h3 className="text-sm font-medium text-gray-300">Net Worth</h3>
+      <main className="max-w-7xl mx-auto px-6 py-8 space-y-8">
+
+        {/* Stats Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+
+          {/* Net Worth Card */}
+          <div className="bg-slate-900/80 p-6 rounded-2xl border border-slate-800 shadow-xl relative overflow-hidden group">
+            <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
+              <Wallet size={80} />
             </div>
-            {/* UPDATED: Changed hardcoded $ to R for Net Worth */}
-            <p className="text-3xl font-bold text-white">R{totalValue.toLocaleString(undefined, { minimumFractionDigits: 2 })}</p>
+            <div className="flex items-center gap-3 mb-2 text-blue-400">
+              <Wallet size={20} />
+              <h3 className="font-medium">Net Worth (ZAR)</h3>
+            </div>
+            <p className="text-4xl font-bold text-white tracking-tight">
+              {/* FIX: Use backend calculated value or fallback to 0 */}
+              R {user?.netWorthZAR?.toLocaleString('en-ZA', { maximumFractionDigits: 2 }) || '0.00'}
+            </p>
+          </div>
+
+          {/* Asset Count Card */}
+          <div className="bg-slate-900/80 p-6 rounded-2xl border border-slate-800 shadow-xl relative overflow-hidden group">
+            <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
+              <TrendingUp size={80} className="text-emerald-500" />
+            </div>
+            <div className="flex items-center gap-3 mb-2 text-emerald-400">
+              <TrendingUp size={20} />
+              <h3 className="font-medium">Total Assets</h3>
+            </div>
+            <p className="text-4xl font-bold text-white tracking-tight">{assets.length}</p>
+          </div>
+
+          {/* Add Asset Button Card */}
+          <button
+            onClick={() => setIsAddModalOpen(true)}
+            className="bg-slate-900/80 p-6 rounded-2xl border border-slate-800 border-dashed hover:border-blue-500 hover:bg-blue-500/5 transition-all duration-300 flex flex-col items-center justify-center gap-3 group cursor-pointer h-full"
+          >
+            <div className="bg-blue-600 rounded-full p-3 group-hover:scale-110 transition-transform shadow-lg shadow-blue-900/30">
+              <Plus className="text-white" size={24} />
+            </div>
+            <span className="font-semibold text-slate-300 group-hover:text-white">Add New Asset</span>
+          </button>
         </div>
 
-        <div className="bg-gray-900 border border-gray-800 p-6 rounded-2xl">
-             <div className="flex items-center gap-3 mb-2">
-                <TrendingUp className="h-5 w-5 text-green-400" />
-                <h3 className="text-sm font-medium text-gray-300">Total Assets</h3>
-            </div>
-            <p className="text-3xl font-bold text-white">{assets.length}</p>
-        </div>
+        {/* Charts & Table Section */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
 
-        <button
-            onClick={() => setIsModalOpen(true)}
-            className="group bg-gray-900 border border-dashed border-gray-700 hover:border-blue-500 hover:bg-gray-800 p-6 rounded-2xl flex flex-col items-center justify-center transition-all cursor-pointer"
-        >
-            <div className="bg-blue-500/20 p-3 rounded-full mb-3 group-hover:bg-blue-500 group-hover:text-white transition-colors text-blue-400">
-                <Plus className="h-6 w-6" />
-            </div>
-            <span className="text-sm font-medium text-gray-400 group-hover:text-white">Add New Asset</span>
-        </button>
-      </div>
+          {/* Chart Area */}
+          <div className="lg:col-span-1 bg-slate-900/80 p-6 rounded-2xl border border-slate-800 shadow-xl">
+             <div className="flex items-center gap-3 mb-6">
+                <PieChart className="text-purple-400" size={20} />
+                <h3 className="font-semibold text-white">Allocation</h3>
+             </div>
+             {/* Pass correct data to chart */}
+             <PortfolioChart assets={assets.map(a => ({
+                name: a.ticker,
+                value: a.quantity * a.buyPrice // FIX: Calculate value for chart
+             }))} />
+          </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        <div className="lg:col-span-1">
-            <PortfolioChart assets={assets} />
-        </div>
-
-        <div className="lg:col-span-2 bg-gray-900 border border-gray-800 rounded-2xl overflow-hidden shadow-xl">
-            <div className="p-6 border-b border-gray-800 flex justify-between items-center">
-                <h2 className="text-xl font-bold">Your Portfolio</h2>
+          {/* Assets List */}
+          <div className="lg:col-span-2 bg-slate-900/80 rounded-2xl border border-slate-800 shadow-xl overflow-hidden flex flex-col">
+            <div className="p-6 border-b border-slate-800 bg-slate-900/50 backdrop-blur-sm">
+              <h3 className="font-bold text-lg text-white">Your Portfolio</h3>
             </div>
 
-            {assets.length === 0 ? (
-                <div className="p-12 text-center text-gray-500">
-                    You have no assets yet. Click "Add New Asset" to start tracking.
+            <div className="overflow-y-auto max-h-[400px]">
+              {assets.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-16 text-slate-500">
+                  <div className="bg-slate-800/50 p-4 rounded-full mb-4">
+                    <TrendingUp size={32} />
+                  </div>
+                  <p>No assets found. Start building your wealth!</p>
                 </div>
-            ) : (
-                <div className="divide-y divide-gray-800">
-                    {assets.map((asset) => (
-                        <div key={asset.id} className="p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4 hover:bg-gray-800/50 transition-colors group">
-                            <div className="flex items-center gap-4">
-                                <div className="h-10 w-10 bg-gray-800 rounded-full flex items-center justify-center text-gray-400">
-                                    <DollarSign className="h-5 w-5" />
-                                </div>
-                                <div onClick={() => handleViewHistory(asset)} className="cursor-pointer group/item">
-                                    <p className="font-bold text-white group-hover/item:text-blue-400 transition-colors">{asset.name}</p>
-                                    <p className="text-xs text-gray-500 uppercase tracking-wide">
-                                      {asset.type} <span className="opacity-0 group-hover/item:opacity-100 ml-1 text-blue-500/50 text-[10px] uppercase font-bold tracking-tighter">(View History)</span>
-                                    </p>
-                                </div>
-                            </div>
+              ) : (
+                <div className="divide-y divide-slate-800">
+                  {assets.map((asset) => (
+                    <div key={asset.id} className="p-4 hover:bg-slate-800/50 transition-colors flex items-center justify-between group">
 
-                            <div className="flex items-center gap-2 justify-end">
-                                <div className="text-right mr-4">
-                                    {/* UPDATED: Dynamic Currency Symbol */}
-                                    <p className="font-bold text-white text-lg">
-                                        {asset.currency === 'ZAR' ? 'R' : '$'}{Number(asset.value).toLocaleString(undefined, { minimumFractionDigits: 2 })}
-                                    </p>
-                                    <p className="text-[10px] text-gray-500 italic">Last updated: {new Date(asset.lastUpdated).toLocaleTimeString()}</p>
-                                </div>
-
-                                {/* UPDATED: Buttons are now always visible (opacity removed) */}
-                                <button
-                                    onClick={() => handleRefresh(asset.id)}
-                                    disabled={refreshingId === asset.id}
-                                    className={`p-2 rounded-lg transition-all ${refreshingId === asset.id ? 'text-blue-500 animate-spin' : 'text-gray-500 hover:text-green-400 hover:bg-green-400/10'}`}
-                                    title="Refresh Price"
-                                >
-                                    <RefreshCw className="h-4 w-4" />
-                                </button>
-
-                                <button
-                                    onClick={() => handleEdit(asset)}
-                                    className="p-2 text-gray-500 hover:text-blue-400 hover:bg-blue-400/10 rounded-lg transition-all"
-                                    title="Edit Asset"
-                                >
-                                    <Pencil className="h-4 w-4" />
-                                </button>
-
-                                <button
-                                    onClick={() => handleDelete(asset.id)}
-                                    className="p-2 text-gray-500 hover:text-red-400 hover:bg-red-400/10 rounded-lg transition-all"
-                                    title="Delete Asset"
-                                >
-                                    <Trash2 className="h-4 w-4" />
-                                </button>
-                            </div>
+                      {/* Left: Ticker & Name */}
+                      <div className="flex items-center gap-4 cursor-pointer" onClick={() => openHistory(asset)}>
+                        <div className="bg-slate-800 p-3 rounded-xl border border-slate-700 text-slate-300 font-bold w-12 h-12 flex items-center justify-center">
+                          {asset.ticker ? asset.ticker.substring(0, 2) : 'AS'}
                         </div>
-                    ))}
+                        <div>
+                          <h4 className="font-bold text-white">{asset.name}</h4>
+                          <div className="flex items-center gap-2 text-sm text-slate-400">
+                            <span className="bg-slate-800 px-1.5 rounded text-xs border border-slate-700">{asset.assetType}</span>
+                            <span>{asset.quantity.toFixed(4)} shares</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Right: Value & Actions */}
+                      <div className="flex items-center gap-6">
+                        <div className="text-right">
+                          <p className="font-bold text-white font-mono text-lg">
+                            {/* FIX: Calculate Value correctly */}
+                            ${(asset.quantity * asset.buyPrice).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          </p>
+                          <p className="text-xs text-slate-500">
+                            Bought @ ${asset.buyPrice}
+                          </p>
+                        </div>
+
+                        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <button onClick={() => {}} className="p-2 hover:bg-slate-700 rounded-lg text-slate-400 hover:text-blue-400 transition" title="Refresh Price">
+                            <RefreshCw size={16} />
+                          </button>
+                          <button onClick={() => handleEdit(asset)} className="p-2 hover:bg-slate-700 rounded-lg text-slate-400 hover:text-yellow-400 transition" title="Edit">
+                            <Edit2 size={16} />
+                          </button>
+                          <button onClick={() => handleDelete(asset.id)} className="p-2 hover:bg-slate-700 rounded-lg text-slate-400 hover:text-red-400 transition" title="Delete">
+                            <Trash2 size={16} />
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
                 </div>
-            )}
+              )}
+            </div>
+          </div>
         </div>
-      </div>
+
+      </main>
 
       <AddAssetModal
-        isOpen={isModalOpen}
-        onClose={handleCloseModal}
-        onAssetAdded={fetchAssets}
-        initialData={editingAsset}
+         isOpen={isAddModalOpen}
+         onClose={handleCloseModal}
+         onAssetAdded={fetchAssets}
+         initialData={editingAsset} // Pass editing data
       />
 
-      <HistoryModal
+      {selectedAsset && (
+        <HistoryModal
           isOpen={isHistoryOpen}
           onClose={() => setIsHistoryOpen(false)}
-          assetId={selectedAsset?.id || null}
-          assetName={selectedAsset?.name || ""}
-          assetCurrency={selectedAsset?.currency || "USD"}
-      />
+          asset={selectedAsset}
+        />
+      )}
 
     </div>
   );

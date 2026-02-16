@@ -1,8 +1,7 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
-import axios from "axios";
-import { X, History, TrendingUp, Clock, Calendar } from "lucide-react";
+import { X, History, TrendingUp, Clock, Calendar, Loader2 } from "lucide-react";
 import {
   AreaChart,
   Area,
@@ -12,6 +11,18 @@ import {
   YAxis
 } from "recharts";
 
+// 1. Define the Asset interface (Must match page.tsx)
+interface Asset {
+  id: number;
+  name: string;
+  ticker: string;
+  assetType: string;
+  quantity: number;
+  buyPrice: number;
+  currency: string;
+  lastUpdated: string;
+}
+
 interface Transaction {
   id: number;
   valueAtTime: number;
@@ -19,47 +30,48 @@ interface Transaction {
   timestamp: string;
 }
 
+// 2. Update Props to accept the full Asset object
 interface HistoryModalProps {
   isOpen: boolean;
   onClose: () => void;
-  assetId: number | null;
-  assetName: string;
-  assetCurrency?: string;
+  asset: Asset | null;
 }
 
 export default function HistoryModal({
   isOpen,
   onClose,
-  assetId,
-  assetName,
-  assetCurrency = "USD"
+  asset
 }: HistoryModalProps) {
   const [history, setHistory] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    if (isOpen && assetId) {
+    if (isOpen && asset?.id) {
       const fetchHistory = async () => {
         setLoading(true);
         try {
           const token = localStorage.getItem("token");
-          const res = await axios.get(`${process.env.NEXT_PUBLIC_API_URL}/api/assets/${assetId}/history`, {
+          // Use the Railway URL directly
+          const res = await fetch(`https://asset-compass-production.up.railway.app/api/assets/${asset.id}/history`, {
             headers: { Authorization: `Bearer ${token}` },
           });
 
-          const sortedData = res.data.sort((a: Transaction, b: Transaction) =>
-            new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
-          );
-          setHistory(sortedData);
+          if (res.ok) {
+            const data = await res.json();
+            const sortedData = data.sort((a: Transaction, b: Transaction) =>
+                new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
+            );
+            setHistory(sortedData);
+          }
         } catch (err) {
-          console.error("Failed to fetch history");
+          console.error("Failed to fetch history", err);
         } finally {
           setLoading(false);
         }
       };
       fetchHistory();
     }
-  }, [isOpen, assetId]);
+  }, [isOpen, asset]);
 
   const chartData = useMemo(() => {
     return history.map((item) => ({
@@ -69,13 +81,14 @@ export default function HistoryModal({
     }));
   }, [history]);
 
-  if (!isOpen) return null;
+  if (!isOpen || !asset) return null;
 
+  // Determine chart colors based on performance
   const startValue = history.length > 0 ? history[0].valueAtTime : 0;
   const endValue = history.length > 0 ? history[history.length - 1].valueAtTime : 0;
   const isPositive = endValue >= startValue;
   const chartColor = isPositive ? "#10B981" : "#EF4444";
-  const currencySymbol = assetCurrency === "ZAR" ? "R" : "$";
+  const currencySymbol = asset.currency === "ZAR" ? "R" : "$";
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in duration-200">
@@ -85,10 +98,12 @@ export default function HistoryModal({
         <div className="p-6 border-b border-gray-800 flex justify-between items-center bg-gray-900/50">
           <div>
              <div className="flex items-center gap-2 mb-1">
-                <History className="h-4 w-4 text-blue-500" />
-                <h2 className="text-lg font-bold text-white">{assetName} Performance</h2>
+                <History className="h-5 w-5 text-blue-500" />
+                <h2 className="text-xl font-bold text-white">{asset.name} <span className="text-gray-500 font-normal">({asset.ticker})</span></h2>
              </div>
-             <p className="text-xs text-gray-500">Track value changes over time</p>
+             <p className="text-xs text-gray-500">
+                Current Position: <span className="text-white font-mono">{asset.quantity.toFixed(4)} shares</span>
+             </p>
           </div>
           <button onClick={onClose} className="text-gray-500 hover:text-white transition-colors bg-gray-800 hover:bg-gray-700 p-2 rounded-full">
             <X className="h-5 w-5" />
@@ -98,7 +113,10 @@ export default function HistoryModal({
         {/* CHART SECTION */}
         <div className="h-64 w-full bg-gradient-to-b from-gray-900 to-gray-950 border-b border-gray-800 p-4 relative">
             {loading ? (
-                <div className="h-full flex items-center justify-center text-gray-500 animate-pulse">Loading Chart...</div>
+                <div className="h-full flex items-center justify-center text-gray-500 gap-2">
+                    <Loader2 className="animate-spin h-5 w-5" />
+                    Loading Chart...
+                </div>
             ) : history.length < 2 ? (
                 <div className="h-full flex flex-col items-center justify-center text-gray-500 text-sm gap-2">
                     <TrendingUp className="h-8 w-8 text-gray-700" />
@@ -116,8 +134,7 @@ export default function HistoryModal({
                         <Tooltip
                             contentStyle={{ backgroundColor: '#111827', borderColor: '#374151', borderRadius: '8px', color: '#fff' }}
                             itemStyle={{ color: '#fff' }}
-                            // FIXED: Using 'any' type to silence strict TypeScript check
-                            formatter={(value: any) => [`${currencySymbol}${Number(value).toLocaleString()}`, "Value"]}
+                            formatter={(value: any) => [`${currencySymbol}${Number(value).toLocaleString(undefined, { minimumFractionDigits: 2 })}`, "Value"]}
                             labelStyle={{ color: '#9CA3AF', marginBottom: '0.5rem' }}
                         />
                         <XAxis dataKey="date" hide />
