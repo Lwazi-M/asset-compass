@@ -3,7 +3,7 @@ package com.assetcompass.tracker.models;
 import jakarta.persistence.*;
 import lombok.*;
 import java.time.LocalDateTime;
-import java.math.BigDecimal; // Import for precision math
+import java.math.BigDecimal;
 
 @Entity
 @Table(name = "assets")
@@ -29,12 +29,15 @@ public class Asset {
     private String assetType;   // e.g., "STOCK", "ETF", "CRYPTO"
 
     // -- FINANCIALS --
-    // We use BigDecimal for money/shares because 'double' causes math errors (0.1 + 0.2 = 0.30000004)
     @Column(nullable = false, precision = 20, scale = 10)
     private BigDecimal quantity;    // e.g., 1.5432000000
 
-    @Column(name = "buy_price", nullable = false, precision = 20, scale = 2)
-    private BigDecimal buyPrice;    // e.g., $210.00
+    @Column(name = "buy_price", nullable = false, precision = 20, scale = 4)
+    private BigDecimal buyPrice;    // e.g., $210.00 (Price in USD)
+
+    // --- NEW: THE "TRADING DESK" UPGRADE ---
+    @Column(name = "exchange_rate_at_buy", precision = 20, scale = 4)
+    private BigDecimal exchangeRateAtBuy; // e.g., R18.50 (Value of $1 in ZAR when bought)
 
     @Column(nullable = false)
     private String currency;    // "USD" or "ZAR"
@@ -51,8 +54,8 @@ public class Asset {
     private AppUser user;
 
     // Helper to calculate current Total Value (Live Price * Quantity)
-    // We will use this in the Controller later
     public BigDecimal calculateCurrentValue(BigDecimal livePrice) {
+        if (livePrice == null) return BigDecimal.ZERO;
         return livePrice.multiply(this.quantity);
     }
 }
