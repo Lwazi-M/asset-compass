@@ -1,5 +1,6 @@
 package com.assetcompass.tracker.config;
 
+import com.assetcompass.tracker.security.JwtAuthenticationFilter;
 import com.assetcompass.tracker.services.CustomUserDetailsService;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -19,6 +20,7 @@ import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
 import java.util.Arrays;
+import java.util.List;
 
 @Configuration
 @EnableWebSecurity
@@ -35,7 +37,6 @@ public class SecurityConfig {
         return new BCryptPasswordEncoder();
     }
 
-    // --- NEW: Expose AuthenticationManager for AuthController ---
     @Bean
     public AuthenticationManager authenticationManager(AuthenticationConfiguration config) throws Exception {
         return config.getAuthenticationManager();
@@ -52,38 +53,35 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
-                .cors(Customizer.withDefaults())
-                .csrf(csrf -> csrf.disable())
+                .cors(Customizer.withDefaults()) // 1. CORS is applied first
+                .csrf(csrf -> csrf.disable())    // 2. CSRF is disabled
                 .authorizeHttpRequests(auth -> auth
-                        // 1. Open Gates for Auth (Register, Login, Verify)
-                        .requestMatchers("/api/auth/**").permitAll()
-                        // 2. Open Gates for Market Data (Search, Rates) - Optional but useful
-                        .requestMatchers("/api/market/**").permitAll()
-                        // 3. Lock everything else
-                        .anyRequest().authenticated()
+                        .requestMatchers("/api/auth/**").permitAll()   // Public access
+                        .requestMatchers("/api/market/**").permitAll() // Public access
+                        .anyRequest().authenticated()                  // Locked
                 )
                 .sessionManagement(session -> session
-                        .sessionCreationPolicy(SessionCreationPolicy.STATELESS) // No Cookies
+                        .sessionCreationPolicy(SessionCreationPolicy.STATELESS)
                 )
                 .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
     }
 
+    // --- FIX: THE "ALLOW ALL" CONFIGURATION ---
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
 
-        // Allow all your environments
-        configuration.setAllowedOrigins(Arrays.asList(
-                "http://localhost:3000",
-                "https://asset-compass-production.up.railway.app",
-                "https://asset-compass-beta.vercel.app"
-        ));
+        // Use strict allow patterns instead of specific strings
+        // This allows Vercel, localhost, and any other domain to connect
+        configuration.setAllowedOriginPatterns(List.of("*"));
 
-        configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS"));
-        configuration.setAllowedHeaders(Arrays.asList("Authorization", "Content-Type"));
+        configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"));
+        configuration.setAllowedHeaders(Arrays.asList("Authorization", "Content-Type", "X-Requested-With", "Accept", "Origin", "Access-Control-Request-Method", "Access-Control-Request-Headers"));
+        configuration.setExposedHeaders(Arrays.asList("Access-Control-Allow-Origin", "Access-Control-Allow-Credentials"));
         configuration.setAllowCredentials(true);
+        configuration.setMaxAge(3600L); // Cache preflight requests for 1 hour
 
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", configuration);
