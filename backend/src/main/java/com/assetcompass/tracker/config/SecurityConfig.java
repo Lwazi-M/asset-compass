@@ -3,8 +3,10 @@ package com.assetcompass.tracker.config;
 import com.assetcompass.tracker.services.CustomUserDetailsService;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
 import org.springframework.security.config.Customizer;
+import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
@@ -33,6 +35,12 @@ public class SecurityConfig {
         return new BCryptPasswordEncoder();
     }
 
+    // --- NEW: Expose AuthenticationManager for AuthController ---
+    @Bean
+    public AuthenticationManager authenticationManager(AuthenticationConfiguration config) throws Exception {
+        return config.getAuthenticationManager();
+    }
+
     @Bean
     public DaoAuthenticationProvider authenticationProvider(CustomUserDetailsService userDetailsService) {
         DaoAuthenticationProvider authProvider = new DaoAuthenticationProvider();
@@ -44,11 +52,15 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
-                .cors(Customizer.withDefaults()) // Enable CORS using the bean below
+                .cors(Customizer.withDefaults())
                 .csrf(csrf -> csrf.disable())
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/api/auth/**").permitAll() // Login/Verify is open
-                        .anyRequest().authenticated() // Everything else is locked
+                        // 1. Open Gates for Auth (Register, Login, Verify)
+                        .requestMatchers("/api/auth/**").permitAll()
+                        // 2. Open Gates for Market Data (Search, Rates) - Optional but useful
+                        .requestMatchers("/api/market/**").permitAll()
+                        // 3. Lock everything else
+                        .anyRequest().authenticated()
                 )
                 .sessionManagement(session -> session
                         .sessionCreationPolicy(SessionCreationPolicy.STATELESS) // No Cookies
@@ -62,11 +74,11 @@ public class SecurityConfig {
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
 
-        // These origins must match your live deployment URLs exactly
+        // Allow all your environments
         configuration.setAllowedOrigins(Arrays.asList(
                 "http://localhost:3000",
                 "https://asset-compass-production.up.railway.app",
-                "https://asset-compass-beta.vercel.app" // Your actual live frontend URL
+                "https://asset-compass-beta.vercel.app"
         ));
 
         configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS"));

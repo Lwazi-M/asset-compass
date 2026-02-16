@@ -6,6 +6,7 @@ import com.assetcompass.tracker.models.Asset;
 import com.assetcompass.tracker.repositories.AppUserRepository;
 import com.assetcompass.tracker.repositories.AssetRepository;
 import com.assetcompass.tracker.services.CurrencyService;
+import com.assetcompass.tracker.services.EmailService;
 import com.assetcompass.tracker.services.StockService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
@@ -26,18 +27,21 @@ public class AssetController {
     private final AppUserRepository userRepository;
     private final StockService stockService;
     private final CurrencyService currencyService;
+    private final EmailService emailService;
 
     public AssetController(AssetRepository assetRepository,
                            AppUserRepository userRepository,
                            StockService stockService,
-                           CurrencyService currencyService) {
+                           CurrencyService currencyService,
+                           EmailService emailService) {
         this.assetRepository = assetRepository;
         this.userRepository = userRepository;
         this.stockService = stockService;
         this.currencyService = currencyService;
+        this.emailService = emailService;
     }
 
-    // --- 1. BUY ASSET (Updated to Save Exchange Rate) ---
+    // --- 1. BUY ASSET (Updated with Trade Confirmation Email) ---
     @PostMapping("/buy")
     public ResponseEntity<?> buyAsset(@RequestBody BuyAssetRequest request) {
         // 1. Get Logged-in User
@@ -51,23 +55,21 @@ public class AssetController {
             return ResponseEntity.badRequest().body("Could not fetch price for ticker: " + request.getTicker());
         }
 
-        // 3. Fetch Live Exchange Rate (CRITICAL for "Trading Desk" features)
-        BigDecimal usdRate = currencyService.getUsdToZarRate(); // e.g., 18.50
+        // 3. Fetch Live Exchange Rate
+        BigDecimal usdRate = currencyService.getUsdToZarRate();
 
         // 4. Handle Currency Conversion (ZAR -> USD)
         BigDecimal investedAmountUsd = request.getAmount();
 
         // If user is paying in ZAR, convert it first
         if ("ZAR".equalsIgnoreCase(request.getCurrency())) {
-            // Formula: R5000 / 18.50 = $270.27
             investedAmountUsd = request.getAmount().divide(usdRate, 2, RoundingMode.HALF_DOWN);
         }
 
         // 5. Calculate Shares Purchased
-        // Formula: Invested ($270) / Stock Price ($255) = 1.059 shares
         BigDecimal sharesQuantity = investedAmountUsd.divide(stockPriceUsd, 10, RoundingMode.HALF_DOWN);
 
-        // 6. Save to Database (NOW WITH EXCHANGE RATE HISTORY)
+        // 6. Save to Database
         Asset newAsset = Asset.builder()
                 .user(user)
                 .name(request.getName())
@@ -75,7 +77,7 @@ public class AssetController {
                 .assetType(request.getAssetType())
                 .quantity(sharesQuantity)
                 .buyPrice(stockPriceUsd)
-                .exchangeRateAtBuy(usdRate)        // <--- NEW: Saving the specific rate at this moment!
+                .exchangeRateAtBuy(usdRate)
                 .currency("USD")
                 .purchaseDate(LocalDateTime.now())
                 .lastUpdated(LocalDateTime.now())
@@ -83,12 +85,26 @@ public class AssetController {
 
         assetRepository.save(newAsset);
 
+        // --- 7. SEND TRADE CONFIRMATION EMAIL (Async) ---
+        // We use a final variable for the lambda expression
+        final BigDecimal finalInvestedAmount = investedAmountUsd;
+
+        new Thread(() -> {
+            emailService.sendTradeConfirmation(
+                    user.getEmail(),
+                    newAsset.getTicker(),
+                    sharesQuantity,
+                    stockPriceUsd,
+                    finalInvestedAmount
+            );
+        }).start();
+
         return ResponseEntity.ok(Map.of(
                 "message", "Asset purchased successfully!",
                 "sharesOwned", sharesQuantity,
                 "stockPrice", stockPriceUsd,
                 "investedUsd", investedAmountUsd,
-                "exchangeRateLocked", usdRate // Return this so the user sees the rate used
+                "exchangeRateLocked", usdRate
         ));
     }
 
@@ -101,17 +117,15 @@ public class AssetController {
         return assetRepository.findByUserId(user.getId());
     }
 
-    // --- 3. REFRESH PRICE (For Profit/Loss Calculation) ---
+    // --- 3. REFRESH PRICE ---
     @PutMapping("/{id}/refresh")
     public ResponseEntity<?> refreshAssetPrice(@PathVariable Long id) {
         Asset asset = assetRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Asset not found"));
 
-        // Fetch the LATEST price from AlphaVantage
         BigDecimal currentPrice = stockService.getStockPrice(asset.getTicker());
 
         if (currentPrice != null) {
-            // We return the new price so the Frontend can calculate P/L dynamically
             return ResponseEntity.ok(Map.of(
                     "ticker", asset.getTicker(),
                     "oldPrice", asset.getBuyPrice(),
