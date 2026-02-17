@@ -1,16 +1,16 @@
 package com.assetcompass.tracker.services;
 
-import brevo.ApiClient;
-import brevo.ApiException;
-import brevo.Configuration;
-import brevo.auth.ApiKeyAuth;
-import brevo.model.*;
-import com.getbrevo.api.TransactionalEmailsApi;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
 import java.util.List;
+import java.util.Map;
 
 @Service
 public class EmailService {
@@ -24,72 +24,80 @@ public class EmailService {
     @Value("${brevo.sender.name}")
     private String senderName;
 
-    // Helper to configure the Brevo Client
-    private TransactionalEmailsApi getApiInstance() {
-        ApiClient defaultClient = Configuration.getDefaultApiClient();
-        // Configure API key authorization: api-key
-        ApiKeyAuth apiKey = (ApiKeyAuth) defaultClient.getAuthentication("api-key");
-        apiKey.setApiKey(brevoApiKey);
-        return new TransactionalEmailsApi();
-    }
+    // Use standard Java HttpClient (Java 11+)
+    private final HttpClient httpClient = HttpClient.newHttpClient();
+    private final ObjectMapper objectMapper = new ObjectMapper(); // For JSON conversion
 
-    // 1. Send Verification Email
-    public void sendVerificationEmail(String toEmail, String code) {
+    // Helper method to send raw JSON to Brevo
+    private void sendBrevoEmail(String toEmail, String subject, String htmlContent) {
         try {
-            TransactionalEmailsApi api = getApiInstance();
-            SendSmtpEmail email = new SendSmtpEmail();
+            // 1. Build JSON Payload
+            Map<String, Object> payload = Map.of(
+                    "sender", Map.of("name", senderName, "email", senderEmail),
+                    "to", List.of(Map.of("email", toEmail)),
+                    "subject", subject,
+                    "htmlContent", htmlContent
+            );
 
-            email.setSender(new SendSmtpEmailSender().email(senderEmail).name(senderName));
-            email.setTo(List.of(new SendSmtpEmailTo().email(toEmail)));
-            email.setSubject("Verify your AssetCompass Account");
+            String jsonBody = objectMapper.writeValueAsString(payload);
 
-            String htmlContent = String.format("""
-                <div style="font-family: Arial, sans-serif; padding: 20px; color: #333;">
-                    <h2 style="color: #2563eb;">Welcome to AssetCompass! 🧭</h2>
-                    <p>Your verification code is:</p>
-                    <h1 style="background-color: #f3f4f6; padding: 10px; display: inline-block; letter-spacing: 5px;">%s</h1>
-                    <p>This code expires in 15 minutes.</p>
-                </div>
-                """, code);
-            email.setHtmlContent(htmlContent);
+            // 2. Build Request
+            HttpRequest request = HttpRequest.newBuilder()
+                    .uri(URI.create("https://api.brevo.com/v3/smtp/email"))
+                    .header("api-key", brevoApiKey)
+                    .header("Content-Type", "application/json")
+                    .header("Accept", "application/json")
+                    .POST(HttpRequest.BodyPublishers.ofString(jsonBody))
+                    .build();
 
-            api.sendTransacEmail(email);
-            System.out.println("✅ Verification email sent to " + toEmail + " via Brevo API");
+            // 3. Send Async
+            httpClient.sendAsync(request, HttpResponse.BodyHandlers.ofString())
+                    .thenAccept(response -> {
+                        if (response.statusCode() >= 200 && response.statusCode() < 300) {
+                            System.out.println("✅ Email sent successfully to " + toEmail);
+                        } else {
+                            System.err.println("❌ Brevo Error (" + response.statusCode() + "): " + response.body());
+                        }
+                    });
 
-        } catch (ApiException e) {
-            System.err.println("❌ Failed to send Brevo email: " + e.getResponseBody());
+        } catch (Exception e) {
+            System.err.println("❌ Failed to construct email request: " + e.getMessage());
             e.printStackTrace();
         }
     }
 
+    // 1. Send Verification Email
+    public void sendVerificationEmail(String toEmail, String code) {
+        String htmlContent = String.format("""
+            <html>
+            <body style="font-family: Arial, sans-serif; padding: 20px; color: #333;">
+                <h2 style="color: #2563eb;">Welcome to AssetCompass! 🧭</h2>
+                <p>Your verification code is:</p>
+                <h1 style="background-color: #f3f4f6; padding: 10px; display: inline-block; letter-spacing: 5px;">%s</h1>
+                <p>This code expires in 15 minutes.</p>
+            </body>
+            </html>
+            """, code);
+
+        sendBrevoEmail(toEmail, "Verify your AssetCompass Account", htmlContent);
+    }
+
     // 2. Send Trade Confirmation
     public void sendTradeConfirmation(String toEmail, String ticker, BigDecimal shares, BigDecimal price, BigDecimal totalSpent) {
-        try {
-            TransactionalEmailsApi api = getApiInstance();
-            SendSmtpEmail email = new SendSmtpEmail();
+        String htmlContent = String.format("""
+            <html>
+            <body style="font-family: Arial, sans-serif; padding: 20px; color: #333;">
+                <h2 style="color: #10b981;">Trade Executed 🚀</h2>
+                <p>Bought <strong>%s</strong></p>
+                <ul>
+                    <li>Shares: %.4f</li>
+                    <li>Price: $%.2f</li>
+                    <li>Total: $%.2f</li>
+                </ul>
+            </body>
+            </html>
+            """, ticker, shares, price, totalSpent);
 
-            email.setSender(new SendSmtpEmailSender().email(senderEmail).name(senderName));
-            email.setTo(List.of(new SendSmtpEmailTo().email(toEmail)));
-            email.setSubject("Trade Executed: " + ticker);
-
-            String htmlContent = String.format("""
-                <div style="font-family: Arial, sans-serif; padding: 20px; color: #333;">
-                    <h2 style="color: #10b981;">Trade Executed 🚀</h2>
-                    <p>Bought <strong>%s</strong></p>
-                    <ul>
-                        <li>Shares: %.4f</li>
-                        <li>Price: $%.2f</li>
-                        <li>Total: $%.2f</li>
-                    </ul>
-                </div>
-                """, ticker, shares, price, totalSpent);
-            email.setHtmlContent(htmlContent);
-
-            api.sendTransacEmail(email);
-            System.out.println("✅ Trade email sent to " + toEmail + " via Brevo API");
-
-        } catch (ApiException e) {
-            System.err.println("❌ Failed to send trade email: " + e.getResponseBody());
-        }
+        sendBrevoEmail(toEmail, "Trade Executed: " + ticker, htmlContent);
     }
 }
