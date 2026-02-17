@@ -39,10 +39,15 @@ public class AppUser implements UserDetails {
     @Column(name = "verification_expires_at")
     private LocalDateTime verificationCodeExpiresAt;
 
-    // FIX: Changed primitive 'boolean' to Wrapper 'Boolean' to handle NULLs in existing DB records
+    // We use Boolean (wrapper) to allow NULL values from old database records
     @Builder.Default
     @Column(name = "is_enabled")
     private Boolean isEnabled = false;
+
+    // --- FIX: Manual Setter to support AuthController calling setEnabled(true) ---
+    public void setEnabled(boolean enabled) {
+        this.isEnabled = enabled;
+    }
 
     // --- UserDetails Implementation ---
 
@@ -68,7 +73,7 @@ public class AppUser implements UserDetails {
 
     @Override
     public boolean isEnabled() {
-        // FIX: Safely convert potential NULLs to false
+        // Safely handle nulls from DB
         return Boolean.TRUE.equals(isEnabled);
     }
 }
