@@ -10,7 +10,6 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
-import java.util.Collections;
 import java.util.List;
 
 @Service
@@ -25,9 +24,10 @@ public class EmailService {
     @Value("${brevo.sender.name}")
     private String senderName;
 
-    // Configure the Brevo API Client
+    // Helper to configure the Brevo Client
     private TransactionalEmailsApi getApiInstance() {
         ApiClient defaultClient = Configuration.getDefaultApiClient();
+        // Configure API key authorization: api-key
         ApiKeyAuth apiKey = (ApiKeyAuth) defaultClient.getAuthentication("api-key");
         apiKey.setApiKey(brevoApiKey);
         return new TransactionalEmailsApi();
@@ -54,7 +54,7 @@ public class EmailService {
             email.setHtmlContent(htmlContent);
 
             api.sendTransacEmail(email);
-            System.out.println("✅ Verification email sent to " + toEmail + " via Brevo");
+            System.out.println("✅ Verification email sent to " + toEmail + " via Brevo API");
 
         } catch (ApiException e) {
             System.err.println("❌ Failed to send Brevo email: " + e.getResponseBody());
@@ -86,7 +86,7 @@ public class EmailService {
             email.setHtmlContent(htmlContent);
 
             api.sendTransacEmail(email);
-            System.out.println("✅ Trade email sent to " + toEmail + " via Brevo");
+            System.out.println("✅ Trade email sent to " + toEmail + " via Brevo API");
 
         } catch (ApiException e) {
             System.err.println("❌ Failed to send trade email: " + e.getResponseBody());
