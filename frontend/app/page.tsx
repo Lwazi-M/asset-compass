@@ -4,6 +4,7 @@ import { useState } from "react";
 import axios from "axios";
 import { Lock, Mail, Key, ArrowRight, CheckCircle } from "lucide-react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 
 export default function LoginPage() {
   const [step, setStep] = useState<"login" | "verify">("login");
@@ -22,8 +23,8 @@ export default function LoginPage() {
       setError("");
 
       try {
-          // Change from "/api/auth/login" to the full production URL
-          await axios.post(`${process.env.NEXT_PUBLIC_API_URL}/api/auth/login`, {
+          // Use the environment variable for production URL
+          await axios.post(`${process.env.NEXT_PUBLIC_API_URL || 'https://asset-compass-production.up.railway.app'}/api/auth/login`, {
               email,
               password
           });
@@ -42,7 +43,7 @@ export default function LoginPage() {
       setError("");
 
       try {
-        const res = await axios.post(`${process.env.NEXT_PUBLIC_API_URL}/api/auth/verify`, {
+        const res = await axios.post(`${process.env.NEXT_PUBLIC_API_URL || 'https://asset-compass-production.up.railway.app'}/api/auth/verify`, {
             email,
             code
         });
@@ -62,7 +63,7 @@ export default function LoginPage() {
   return (
     <div className="flex min-h-screen items-center justify-center bg-gray-950 text-white p-4">
       <div className="w-full max-w-md bg-gray-900 border border-gray-800 rounded-2xl shadow-xl p-8">
-        
+
         {/* Header */}
         <div className="text-center mb-8">
           <h1 className="text-3xl font-bold tracking-tight text-blue-500">AssetCompass</h1>
@@ -115,6 +116,14 @@ export default function LoginPage() {
             >
               {loading ? "Checking..." : <>Sign In <ArrowRight className="h-4 w-4" /></>}
             </button>
+
+            {/* REGISTER LINK */}
+            <div className="mt-4 text-center text-sm text-gray-400">
+              Don't have an account?{" "}
+              <Link href="/register" className="font-medium text-blue-400 hover:text-blue-300 transition-colors">
+                Sign up now
+              </Link>
+            </div>
           </form>
         )}
 
@@ -125,7 +134,7 @@ export default function LoginPage() {
               <div className="inline-flex items-center justify-center h-12 w-12 rounded-full bg-blue-500/10 text-blue-400 mb-3">
                 <Mail className="h-6 w-6" />
               </div>
-              <h3 className="text-lg font-medium">Check your Console</h3>
+              <h3 className="text-lg font-medium">Check your Console/Email</h3>
               <p className="text-sm text-gray-400">We sent a code to {email}</p>
             </div>
 
