@@ -3,7 +3,7 @@ package com.assetcompass.tracker.controllers;
 import com.assetcompass.tracker.models.AppUser;
 import com.assetcompass.tracker.repositories.AppUserRepository;
 import com.assetcompass.tracker.security.JwtUtil;
-import com.assetcompass.tracker.services.ResendEmailService;
+import com.assetcompass.tracker.services.EmailService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -23,13 +23,13 @@ public class AuthController {
     private final AppUserRepository userRepository;
     private final JwtUtil jwtUtil;
     private final PasswordEncoder passwordEncoder;
-    private final ResendEmailService emailService;
+    private final EmailService emailService;
 
     public AuthController(AuthenticationManager authenticationManager,
                           AppUserRepository userRepository,
                           JwtUtil jwtUtil,
                           PasswordEncoder passwordEncoder,
-                          ResendEmailService emailService) {
+                          EmailService emailService) {
         this.authenticationManager = authenticationManager;
         this.userRepository = userRepository;
         this.jwtUtil = jwtUtil;

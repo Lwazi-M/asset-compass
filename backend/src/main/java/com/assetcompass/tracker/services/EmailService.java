@@ -18,7 +18,7 @@ public class EmailService {
         this.mailSender = mailSender;
     }
 
-    // 1. Verification Email (Upgraded to Real Email)
+    // 1. Verification Email (Gmail)
     public void sendVerificationEmail(String toEmail, String code) {
         try {
             MimeMessage message = mailSender.createMimeMessage();
@@ -39,10 +39,10 @@ public class EmailService {
 
             helper.setText(htmlContent, true);
             mailSender.send(message);
-            System.out.println("Verification email sent to " + toEmail);
+            System.out.println("✅ Verification email sent to " + toEmail);
 
         } catch (MessagingException e) {
-            System.err.println("Failed to send email: " + e.getMessage());
+            System.err.println("❌ Failed to send email: " + e.getMessage());
         }
     }
 
@@ -71,10 +71,10 @@ public class EmailService {
 
             helper.setText(htmlContent, true);
             mailSender.send(message);
-            System.out.println("Trade confirmation sent to " + toEmail);
+            System.out.println("✅ Trade confirmation sent to " + toEmail);
 
         } catch (MessagingException e) {
-            System.err.println("Failed to send trade email: " + e.getMessage());
+            System.err.println("❌ Failed to send trade email: " + e.getMessage());
         }
     }
 }
