@@ -100,7 +100,7 @@ public class AuthController {
         // --- FIX: Check Expiry Date ---
         if (user.getVerificationCodeExpiresAt() == null ||
                 user.getVerificationCodeExpiresAt().isBefore(LocalDateTime.now())) {
-            return ResponseEntity.badRequest().body("Verification code has expired. Please register again.");
+            return ResponseEntity.badRequest().body("Verification code has expired. Please request a new one.");
         }
 
         if (user.getVerificationCode().equals(code)) {
@@ -117,7 +117,43 @@ public class AuthController {
         return ResponseEntity.badRequest().body("Invalid verification code");
     }
 
-    // --- 3. LOGIN ---
+    // --- 3. RESEND CODE (NEW ENDPOINT) ---
+    @PostMapping("/resend-code")
+    public ResponseEntity<?> resendCode(@RequestBody Map<String, String> request) {
+        String email = request.get("email");
+
+        Optional<AppUser> userOpt = userRepository.findByEmail(email);
+        if (userOpt.isEmpty()) {
+            return ResponseEntity.badRequest().body("User not found");
+        }
+
+        AppUser user = userOpt.get();
+
+        if (user.isEnabled()) {
+            return ResponseEntity.badRequest().body("Account is already verified. Please login.");
+        }
+
+        // Generate NEW code
+        String newCode = String.format("%06d", new Random().nextInt(999999));
+        user.setVerificationCode(newCode);
+        user.setVerificationCodeExpiresAt(LocalDateTime.now().plusMinutes(15)); // Reset expiry
+        userRepository.save(user);
+
+        // Send Email
+        new Thread(() -> {
+            try {
+                System.out.println("--- RESENDING EMAIL ---");
+                emailService.sendVerificationEmail(user.getEmail(), newCode);
+            } catch (Exception e) {
+                System.err.println("--- RESEND FAILED ---");
+                e.printStackTrace();
+            }
+        }).start();
+
+        return ResponseEntity.ok(Map.of("message", "New verification code sent!"));
+    }
+
+    // --- 4. LOGIN ---
     @PostMapping("/login")
     public ResponseEntity<?> login(@RequestBody Map<String, String> request) {
         String email = request.get("email");
