@@ -36,13 +36,13 @@ public class AppUser implements UserDetails {
     @Column(name = "verification_code")
     private String verificationCode;
 
-    // FIX: Restored this field so AuthService can compile successfully
     @Column(name = "verification_expires_at")
     private LocalDateTime verificationCodeExpiresAt;
 
+    // FIX: Changed primitive 'boolean' to Wrapper 'Boolean' to handle NULLs in existing DB records
     @Builder.Default
     @Column(name = "is_enabled")
-    private boolean isEnabled = false;
+    private Boolean isEnabled = false;
 
     // --- UserDetails Implementation ---
 
@@ -67,5 +67,8 @@ public class AppUser implements UserDetails {
     public boolean isCredentialsNonExpired() { return true; }
 
     @Override
-    public boolean isEnabled() { return isEnabled; }
+    public boolean isEnabled() {
+        // FIX: Safely convert potential NULLs to false
+        return Boolean.TRUE.equals(isEnabled);
+    }
 }
