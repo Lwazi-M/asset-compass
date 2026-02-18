@@ -4,22 +4,26 @@ import { useState, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import axios from "axios";
 
-// We wrap the logic in a component to use searchParams safely
 function VerifyForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const email = searchParams.get("email");
+  // Check if we passed the code from the Register page
+  const autoCode = searchParams.get("autoCode");
 
-  const [code, setCode] = useState("");
+  const [code, setCode] = useState(autoCode || "");
   const [error, setError] = useState("");
   const [successMsg, setSuccessMsg] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-
-  // --- TIMER STATE ---
-  const [timeLeft, setTimeLeft] = useState(120); // 2 minutes in seconds
+  const [timeLeft, setTimeLeft] = useState(120);
   const [canResend, setCanResend] = useState(false);
 
-  // Countdown Logic
+  useEffect(() => {
+    if (autoCode) {
+      setSuccessMsg(`DEV MODE: Your code is ${autoCode}`);
+    }
+  }, [autoCode]);
+
   useEffect(() => {
     if (timeLeft > 0) {
       const timerId = setTimeout(() => setTimeLeft(timeLeft - 1), 1000);
@@ -29,7 +33,6 @@ function VerifyForm() {
     }
   }, [timeLeft]);
 
-  // Helper to format MM:SS
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;
@@ -43,7 +46,6 @@ function VerifyForm() {
     setSuccessMsg("");
 
     try {
-      // Use axios to send JSON body (cleaner than fetch for POST)
       const res = await axios.post(
         `${process.env.NEXT_PUBLIC_API_URL || 'https://asset-compass-production.up.railway.app'}/api/auth/verify`,
         { email, code }
@@ -61,23 +63,30 @@ function VerifyForm() {
   };
 
   const handleResend = async () => {
-    if (!canResend) return;
-
+    // Force reset for UX
     setError("");
     setSuccessMsg("");
     setCanResend(false);
-    setTimeLeft(300); // Reset timer to 5 minutes (300s)
+    setTimeLeft(300);
 
     try {
-      await axios.post(
+      const res = await axios.post(
         `${process.env.NEXT_PUBLIC_API_URL || 'https://asset-compass-production.up.railway.app'}/api/auth/resend-code`,
         { email }
       );
-      setSuccessMsg("New code sent! Check your inbox.");
+
+      // --- DEV MODE MAGIC ---
+      // If the backend sent us the code, show it immediately!
+      if (res.data.debug_code) {
+        setSuccessMsg(`DEV MODE: Your new code is ${res.data.debug_code}`);
+        setCode(res.data.debug_code); // Auto-fill input for convenience
+      } else {
+        setSuccessMsg("New code sent! Check your inbox.");
+      }
+
     } catch (err: any) {
-      setError("Failed to resend code. Please try again later.");
-      setTimeLeft(0); // Allow retry immediately on fail
-      setCanResend(true);
+      setError("Failed to resend code.");
+      setCanResend(true); // Let them try again if it failed
     }
   };
 
@@ -89,15 +98,16 @@ function VerifyForm() {
       </p>
 
       <form onSubmit={handleSubmit} className="mt-8 space-y-6">
-        {error && (
-          <div className="rounded bg-red-900/50 p-3 text-sm text-red-200 border border-red-800">
-            {error}
+        {/* Success/Dev Mode Message */}
+        {successMsg && (
+          <div className="rounded bg-blue-900/50 p-4 text-sm text-blue-200 border border-blue-800 animate-pulse">
+            <span className="font-bold">🔔 {successMsg}</span>
           </div>
         )}
 
-        {successMsg && (
-          <div className="rounded bg-green-900/50 p-3 text-sm text-green-200 border border-green-800">
-            {successMsg}
+        {error && (
+          <div className="rounded bg-red-900/50 p-3 text-sm text-red-200 border border-red-800">
+            {error}
           </div>
         )}
 
@@ -122,22 +132,21 @@ function VerifyForm() {
           {isLoading ? "Verifying..." : "Verify Account"}
         </button>
 
-        {/* --- RESEND LOGIC UI --- */}
         <div className="mt-4 text-sm text-gray-400">
           Didn't get the code?{" "}
-          {canResend ? (
-            <button
-              type="button"
-              onClick={handleResend}
-              className="font-medium text-blue-400 hover:text-blue-300 underline cursor-pointer hover:no-underline transition-all"
-            >
-              Resend Code
-            </button>
-          ) : (
-            <span className="text-gray-500 cursor-not-allowed">
-              Resend available in {formatTime(timeLeft)}
-            </span>
-          )}
+          <button
+            type="button"
+            onClick={handleResend}
+            // Allow clicking even if disabled logic triggers, for ease of testing
+            disabled={!canResend}
+            className={`font-medium underline transition-all ${
+              canResend
+                ? "text-blue-400 hover:text-blue-300 cursor-pointer"
+                : "text-gray-600 cursor-not-allowed no-underline"
+            }`}
+          >
+            {canResend ? "Resend Code Now" : `Resend in ${formatTime(timeLeft)}`}
+          </button>
         </div>
       </form>
     </div>
