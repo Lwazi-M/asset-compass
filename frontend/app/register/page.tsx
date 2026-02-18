@@ -21,7 +21,7 @@ export default function Register() {
 
     try {
       const res = await fetch(
-        "https://asset-compass-production.up.railway.app/api/auth/register",
+        `${process.env.NEXT_PUBLIC_API_URL || 'https://asset-compass-production.up.railway.app'}/api/auth/register`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -29,12 +29,16 @@ export default function Register() {
         }
       );
 
+      const data = await res.json();
+
       if (res.ok) {
-        // Success! Send them to the verification page with their email
-        router.push(`/verify?email=${encodeURIComponent(formData.email)}`);
+        // Success! Extract the debug code if it exists
+        const autoCode = data.debug_code ? `&autoCode=${data.debug_code}` : "";
+
+        // Pass it to the verify page
+        router.push(`/verify?email=${encodeURIComponent(formData.email)}${autoCode}`);
       } else {
-        const text = await res.text();
-        setError(text || "Registration failed");
+        setError(data.message || "Registration failed");
       }
     } catch (err) {
       setError("Something went wrong. Please try again.");
