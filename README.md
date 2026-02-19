@@ -2,7 +2,7 @@
 
 **Professional Portfolio Tracking Application**
 
-AssetCompass is a full-stack financial tracking application designed to help users monitor their net worth across various asset classes (Stocks, Crypto, Real Estate, Cash). It features real-time price updates, secure passwordless authentication, and interactive data visualization.
+AssetCompass is a full-stack financial tracking application designed to help users monitor their net worth across various asset classes (Stocks, Crypto, Real Estate, Cash). It features real-time price updates, secure JWT authentication, and interactive data visualization.
 
 🔗 **Live Demo:** [https://asset-compass-beta.vercel.app](https://asset-compass-beta.vercel.app)
 
@@ -11,8 +11,8 @@ AssetCompass is a full-stack financial tracking application designed to help use
 ## 🚀 Features
 
 * **📊 Real-Time Dashboard:** Visualize your total net worth and asset distribution.
-* **🔐 Secure Authentication:** Stateless JWT authentication with email-based verification codes (OTP).
-* **📈 Live Market Data:** Integrated with **AlphaVantage API** for real-time stock and crypto pricing.
+* **🔐 Secure Authentication:** Fast and secure stateless JWT authentication with encrypted passwords and an instant registration flow.
+* **📈 Live Market Data:** Integrated with the **AlphaVantage API** for real-time stock and exchange rate pricing. Includes a **custom Circuit Breaker fallback mechanism** to ensure an uninterrupted user experience even if third-party API rate limits are reached.
 * **📜 Transaction History:** Automatically logs value changes and price refreshes for every asset.
 * **📱 Responsive Design:** Built with **Tailwind CSS** for a seamless mobile and desktop experience.
 * **☁️ Cloud Native:** Fully deployed on **Vercel** (Frontend), **Railway** (Backend), and **Neon** (Database).
@@ -137,7 +137,6 @@ To deploy this app, you need to set the following environment variables in your 
 | `SPRING_DATASOURCE_USERNAME` | Database Username | **Backend (Railway)** |
 | `SPRING_DATASOURCE_PASSWORD` | Database Password | **Backend (Railway)** |
 | `APP_ALPHAVANTAGE_KEY` | AlphaVantage API Key for stock data | **Backend (Railway)** |
-| `RESEND_API_KEY` | Resend API key Token | **Backend (Railway)** |
 
 ### **📄 License**
 Distributed under the MIT License. See LICENSE for more information.
