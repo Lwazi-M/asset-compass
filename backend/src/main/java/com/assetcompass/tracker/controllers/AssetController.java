@@ -6,7 +6,6 @@ import com.assetcompass.tracker.models.Asset;
 import com.assetcompass.tracker.repositories.AppUserRepository;
 import com.assetcompass.tracker.repositories.AssetRepository;
 import com.assetcompass.tracker.services.CurrencyService;
-import com.assetcompass.tracker.services.EmailService;
 import com.assetcompass.tracker.services.StockService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
@@ -27,21 +26,18 @@ public class AssetController {
     private final AppUserRepository userRepository;
     private final StockService stockService;
     private final CurrencyService currencyService;
-    private final EmailService emailService;
 
     public AssetController(AssetRepository assetRepository,
                            AppUserRepository userRepository,
                            StockService stockService,
-                           CurrencyService currencyService,
-                           EmailService emailService) {
+                           CurrencyService currencyService) {
         this.assetRepository = assetRepository;
         this.userRepository = userRepository;
         this.stockService = stockService;
         this.currencyService = currencyService;
-        this.emailService = emailService;
     }
 
-    // --- 1. BUY ASSET (Updated with Trade Confirmation Email) ---
+    // --- 1. BUY ASSET ---
     @PostMapping("/buy")
     public ResponseEntity<?> buyAsset(@RequestBody BuyAssetRequest request) {
         // 1. Get Logged-in User
@@ -84,20 +80,6 @@ public class AssetController {
                 .build();
 
         assetRepository.save(newAsset);
-
-        // --- 7. SEND TRADE CONFIRMATION EMAIL (Async) ---
-        // We use a final variable for the lambda expression
-        final BigDecimal finalInvestedAmount = investedAmountUsd;
-
-        new Thread(() -> {
-            emailService.sendTradeConfirmation(
-                    user.getEmail(),
-                    newAsset.getTicker(),
-                    sharesQuantity,
-                    stockPriceUsd,
-                    finalInvestedAmount
-            );
-        }).start();
 
         return ResponseEntity.ok(Map.of(
                 "message", "Asset purchased successfully!",
