@@ -1,5 +1,8 @@
 # Asset-Compass 🧭
 
+<img width="1547" height="889" alt="Screenshot 2026-02-19 214903" src="https://github.com/user-attachments/assets/0e5736a5-259c-4e1f-8d8c-e21958b9a1fb" />
+
+
 **Professional Portfolio Tracking Application**
 
 AssetCompass is a full-stack financial tracking application designed to help users monitor their net worth across various asset classes (Stocks, Crypto, Real Estate, Cash). It features real-time price updates, secure JWT authentication, and interactive data visualization.
