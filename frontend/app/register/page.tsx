@@ -29,19 +29,15 @@ export default function Register() {
         }
       );
 
-      const data = await res.json();
-
       if (res.ok) {
-        // Success! Extract the debug code if it exists
-        const autoCode = data.debug_code ? `&autoCode=${data.debug_code}` : "";
-
-        // Pass it to the verify page
-        router.push(`/verify?email=${encodeURIComponent(formData.email)}${autoCode}`);
+        // Success! Send them straight back to the login page with a success flag
+        router.push("/?registered=true");
       } else {
-        setError(data.message || "Registration failed");
+        const data = await res.json().catch(() => ({}));
+        setError(data.message || "Registration failed. Please try again.");
       }
     } catch (err) {
-      setError("Something went wrong. Please try again.");
+      setError("Something went wrong. Please check your connection.");
     } finally {
       setIsLoading(false);
     }
@@ -68,7 +64,7 @@ export default function Register() {
               <input
                 type="text"
                 required
-                className="mt-1 block w-full rounded-lg bg-gray-700 border border-gray-600 p-2.5 text-white placeholder-gray-400 focus:border-blue-500 focus:ring-blue-500"
+                className="mt-1 block w-full rounded-lg bg-gray-700 border border-gray-600 p-2.5 text-white placeholder-gray-400 focus:border-blue-500 focus:ring-blue-500 outline-none"
                 placeholder="John Doe"
                 value={formData.fullName}
                 onChange={(e) => setFormData({ ...formData, fullName: e.target.value })}
@@ -80,7 +76,7 @@ export default function Register() {
               <input
                 type="email"
                 required
-                className="mt-1 block w-full rounded-lg bg-gray-700 border border-gray-600 p-2.5 text-white placeholder-gray-400 focus:border-blue-500 focus:ring-blue-500"
+                className="mt-1 block w-full rounded-lg bg-gray-700 border border-gray-600 p-2.5 text-white placeholder-gray-400 focus:border-blue-500 focus:ring-blue-500 outline-none"
                 placeholder="name@company.com"
                 value={formData.email}
                 onChange={(e) => setFormData({ ...formData, email: e.target.value })}
@@ -92,7 +88,7 @@ export default function Register() {
               <input
                 type="password"
                 required
-                className="mt-1 block w-full rounded-lg bg-gray-700 border border-gray-600 p-2.5 text-white placeholder-gray-400 focus:border-blue-500 focus:ring-blue-500"
+                className="mt-1 block w-full rounded-lg bg-gray-700 border border-gray-600 p-2.5 text-white placeholder-gray-400 focus:border-blue-500 focus:ring-blue-500 outline-none"
                 placeholder="••••••••"
                 value={formData.password}
                 onChange={(e) => setFormData({ ...formData, password: e.target.value })}
@@ -103,7 +99,7 @@ export default function Register() {
           <button
             type="submit"
             disabled={isLoading}
-            className="w-full rounded-lg bg-blue-600 px-5 py-3 text-center text-sm font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-4 focus:ring-blue-800 disabled:opacity-50"
+            className="w-full rounded-lg bg-blue-600 px-5 py-3 text-center text-sm font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-4 focus:ring-blue-800 disabled:opacity-50 transition-all"
           >
             {isLoading ? "Creating Account..." : "Sign Up"}
           </button>
