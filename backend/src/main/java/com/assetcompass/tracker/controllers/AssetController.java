@@ -3,8 +3,10 @@ package com.assetcompass.tracker.controllers;
 import com.assetcompass.tracker.dtos.BuyAssetRequest;
 import com.assetcompass.tracker.models.AppUser;
 import com.assetcompass.tracker.models.Asset;
+import com.assetcompass.tracker.models.Transaction;
 import com.assetcompass.tracker.repositories.AppUserRepository;
 import com.assetcompass.tracker.repositories.AssetRepository;
+import com.assetcompass.tracker.repositories.TransactionRepository;
 import com.assetcompass.tracker.services.CurrencyService;
 import com.assetcompass.tracker.services.StockService;
 import org.springframework.http.ResponseEntity;
@@ -26,15 +28,18 @@ public class AssetController {
     private final AppUserRepository userRepository;
     private final StockService stockService;
     private final CurrencyService currencyService;
+    private final TransactionRepository transactionRepository;
 
     public AssetController(AssetRepository assetRepository,
                            AppUserRepository userRepository,
                            StockService stockService,
-                           CurrencyService currencyService) {
+                           CurrencyService currencyService,
+                           TransactionRepository transactionRepository) {
         this.assetRepository = assetRepository;
         this.userRepository = userRepository;
         this.stockService = stockService;
         this.currencyService = currencyService;
+        this.transactionRepository = transactionRepository;
     }
 
     // --- 1. BUY ASSET ---
@@ -57,7 +62,6 @@ public class AssetController {
         // 4. Handle Currency Conversion (ZAR -> USD)
         BigDecimal investedAmountUsd = request.getAmount();
 
-        // If user is paying in ZAR, convert it first
         if ("ZAR".equalsIgnoreCase(request.getCurrency())) {
             investedAmountUsd = request.getAmount().divide(usdRate, 2, RoundingMode.HALF_DOWN);
         }
@@ -80,6 +84,13 @@ public class AssetController {
                 .build();
 
         assetRepository.save(newAsset);
+
+        // --- 7. Create Initial Transaction Log for Graph ---
+        Transaction initialLog = new Transaction();
+        initialLog.setAsset(newAsset);
+        initialLog.setType("BUY");
+        initialLog.setValueAtTime(stockPriceUsd.multiply(sharesQuantity));
+        transactionRepository.save(initialLog);
 
         return ResponseEntity.ok(Map.of(
                 "message", "Asset purchased successfully!",
@@ -108,9 +119,23 @@ public class AssetController {
         BigDecimal currentPrice = stockService.getStockPrice(asset.getTicker());
 
         if (currentPrice != null) {
+            BigDecimal oldPrice = asset.getBuyPrice();
+
+            // --- FIX: Update the asset with the new price ---
+            asset.setBuyPrice(currentPrice);
+            asset.setLastUpdated(LocalDateTime.now());
+            assetRepository.save(asset);
+
+            // --- FIX: Log the refresh for the history graph ---
+            Transaction refreshLog = new Transaction();
+            refreshLog.setAsset(asset);
+            refreshLog.setType("PRICE_REFRESH");
+            refreshLog.setValueAtTime(currentPrice.multiply(asset.getQuantity()));
+            transactionRepository.save(refreshLog);
+
             return ResponseEntity.ok(Map.of(
                     "ticker", asset.getTicker(),
-                    "oldPrice", asset.getBuyPrice(),
+                    "oldPrice", oldPrice,
                     "currentPrice", currentPrice,
                     "quantity", asset.getQuantity()
             ));
