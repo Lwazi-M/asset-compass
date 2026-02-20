@@ -110,7 +110,15 @@ public class AssetController {
         return assetRepository.findByUserId(user.getId());
     }
 
-    // --- 3. REFRESH PRICE ---
+    // --- 3. GET ASSET HISTORY (NEW: THIS FIXES THE GRAPH) ---
+    @GetMapping("/{id}/history")
+    public ResponseEntity<?> getAssetHistory(@PathVariable Long id) {
+        // Fetch the transaction history for the specific asset
+        List<Transaction> history = transactionRepository.findByAssetIdOrderByTimestampDesc(id);
+        return ResponseEntity.ok(history);
+    }
+
+    // --- 4. REFRESH PRICE ---
     @PutMapping("/{id}/refresh")
     public ResponseEntity<?> refreshAssetPrice(@PathVariable Long id) {
         Asset asset = assetRepository.findById(id)
@@ -144,7 +152,7 @@ public class AssetController {
         return ResponseEntity.badRequest().body("Could not fetch live price.");
     }
 
-    // --- 4. DELETE ASSET ---
+    // --- 5. DELETE ASSET ---
     @DeleteMapping("/{id}")
     public ResponseEntity<?> deleteAsset(@PathVariable Long id) {
         assetRepository.deleteById(id);
