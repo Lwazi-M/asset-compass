@@ -7,14 +7,13 @@ import AddAssetModal from './AddAssetModal';
 import HistoryModal from './HistoryModal';
 import PortfolioChart from './PortfolioChart';
 
-// Define the new "WealthOS" data structure
 interface Asset {
   id: number;
   name: string;
   ticker: string;
   assetType: string;
-  quantity: number;   // New Field
-  buyPrice: number;   // New Field
+  quantity: number;
+  buyPrice: number;
   currency: string;
   lastUpdated: string;
 }
@@ -23,7 +22,7 @@ interface User {
   fullName: string;
   email: string;
   role: string;
-  netWorthZAR?: number; // Backend now calculates this
+  netWorthZAR?: number;
 }
 
 export default function Dashboard() {
@@ -31,13 +30,13 @@ export default function Dashboard() {
   const [user, setUser] = useState<User | null>(null);
   const [assets, setAssets] = useState<Asset[]>([]);
   const [loading, setLoading] = useState(true);
+
+  // Track which asset is currently refreshing
+  const [refreshingId, setRefreshingId] = useState<number | null>(null);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
 
-  // History Modal State
   const [selectedAsset, setSelectedAsset] = useState<Asset | null>(null);
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
-
-  // Edit State
   const [editingAsset, setEditingAsset] = useState<Asset | null>(null);
 
   useEffect(() => {
@@ -52,8 +51,7 @@ export default function Dashboard() {
     }
 
     try {
-      // 1. Fetch User (Now includes Net Worth in ZAR)
-      const userRes = await fetch('https://asset-compass-production.up.railway.app/api/me', {
+      const userRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'https://asset-compass-production.up.railway.app'}/api/me`, {
         headers: { Authorization: `Bearer ${token}` },
       });
 
@@ -61,8 +59,7 @@ export default function Dashboard() {
       const userData = await userRes.json();
       setUser(userData);
 
-      // 2. Fetch Assets
-      const assetRes = await fetch('https://asset-compass-production.up.railway.app/api/assets', {
+      const assetRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'https://asset-compass-production.up.railway.app'}/api/assets`, {
         headers: { Authorization: `Bearer ${token}` },
       });
 
@@ -89,26 +86,34 @@ export default function Dashboard() {
 
     const token = localStorage.getItem('token');
     try {
-        await fetch(`https://asset-compass-production.up.railway.app/api/assets/${id}`, {
+        await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'https://asset-compass-production.up.railway.app'}/api/assets/${id}`, {
             method: 'DELETE',
             headers: { Authorization: `Bearer ${token}` }
         });
-        fetchAssets(); // Refresh list
+        fetchData(); // Refresh list and net worth
     } catch (err) {
         console.error("Failed to delete", err);
     }
   };
 
-  // Re-fetch assets only
-  const fetchAssets = async () => {
+  // --- FIX: Add Refresh Logic ---
+  const handleRefreshPrice = async (id: number) => {
+    setRefreshingId(id);
     const token = localStorage.getItem('token');
-    const res = await fetch('https://asset-compass-production.up.railway.app/api/assets', {
-      headers: { Authorization: `Bearer ${token}` },
-    });
-    if (res.ok) {
-      setAssets(await res.json());
-      // Also refresh user to update Net Worth
-      fetchData();
+    try {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'https://asset-compass-production.up.railway.app'}/api/assets/${id}/refresh`, {
+        method: 'PUT',
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (res.ok) {
+        fetchData(); // Refreshes UI to show new net worth and asset price
+      } else {
+        alert("Failed to refresh live price from market.");
+      }
+    } catch (err) {
+      console.error("Failed to refresh", err);
+    } finally {
+      setRefreshingId(null);
     }
   };
 
@@ -124,7 +129,7 @@ export default function Dashboard() {
 
   const handleCloseModal = () => {
     setIsAddModalOpen(false);
-    setEditingAsset(null); // Clear editing state
+    setEditingAsset(null);
   };
 
   if (loading) return <div className="flex h-screen items-center justify-center bg-slate-950 text-white">Loading WealthOS...</div>;
@@ -174,7 +179,6 @@ export default function Dashboard() {
               <h3 className="font-medium">Net Worth (ZAR)</h3>
             </div>
             <p className="text-4xl font-bold text-white tracking-tight">
-              {/* FIX: Use backend calculated value or fallback to 0 */}
               R {user?.netWorthZAR?.toLocaleString('en-ZA', { maximumFractionDigits: 2 }) || '0.00'}
             </p>
           </div>
@@ -212,10 +216,9 @@ export default function Dashboard() {
                 <PieChart className="text-purple-400" size={20} />
                 <h3 className="font-semibold text-white">Allocation</h3>
              </div>
-             {/* Pass correct data to chart */}
              <PortfolioChart assets={assets.map(a => ({
                 name: a.ticker,
-                value: a.quantity * a.buyPrice // FIX: Calculate value for chart
+                value: a.quantity * a.buyPrice
              }))} />
           </div>
 
@@ -256,21 +259,24 @@ export default function Dashboard() {
                       <div className="flex items-center gap-6">
                         <div className="text-right">
                           <p className="font-bold text-white font-mono text-lg">
-                            {/* FIX: Calculate Value correctly */}
                             ${(asset.quantity * asset.buyPrice).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                           </p>
                           <p className="text-xs text-slate-500">
-                            Bought @ ${asset.buyPrice}
+                            Current @ ${asset.buyPrice}
                           </p>
                         </div>
 
                         <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                          <button onClick={() => {}} className="p-2 hover:bg-slate-700 rounded-lg text-slate-400 hover:text-blue-400 transition" title="Refresh Price">
-                            <RefreshCw size={16} />
+                          {/* FIX: Connect Refresh Logic */}
+                          <button
+                            onClick={() => handleRefreshPrice(asset.id)}
+                            disabled={refreshingId === asset.id}
+                            className={`p-2 rounded-lg transition ${refreshingId === asset.id ? 'text-blue-500' : 'text-slate-400 hover:text-blue-400 hover:bg-slate-700'}`}
+                            title="Refresh Price"
+                          >
+                            <RefreshCw size={16} className={refreshingId === asset.id ? "animate-spin" : ""} />
                           </button>
-                          <button onClick={() => handleEdit(asset)} className="p-2 hover:bg-slate-700 rounded-lg text-slate-400 hover:text-yellow-400 transition" title="Edit">
-                            <Edit2 size={16} />
-                          </button>
+
                           <button onClick={() => handleDelete(asset.id)} className="p-2 hover:bg-slate-700 rounded-lg text-slate-400 hover:text-red-400 transition" title="Delete">
                             <Trash2 size={16} />
                           </button>
@@ -289,8 +295,8 @@ export default function Dashboard() {
       <AddAssetModal
          isOpen={isAddModalOpen}
          onClose={handleCloseModal}
-         onAssetAdded={fetchAssets}
-         initialData={editingAsset} // Pass editing data
+         onAssetAdded={fetchData}
+         initialData={editingAsset}
       />
 
       {selectedAsset && (
