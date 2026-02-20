@@ -16,7 +16,7 @@ public class CurrencyService {
 
     private final RestTemplate restTemplate = new RestTemplate();
 
-    // Fallback rate in case API fails (Prevents app crash)
+    // Fallback rate in case API fails or rate limit is reached (Prevents app crash)
     private BigDecimal cachedUsdToZarRate = new BigDecimal("18.50");
 
     /**
@@ -34,9 +34,12 @@ public class CurrencyService {
             // Navigate the JSON response from AlphaVantage
             JsonNode rateNode = root.path("Realtime Currency Exchange Rate").path("5. Exchange Rate");
 
+            // Check if we actually got the rate, or if we got an API limit error message
             if (!rateNode.isMissingNode()) {
                 cachedUsdToZarRate = new BigDecimal(rateNode.asText());
                 System.out.println("✅ Live USD/ZAR Rate Fetched: R" + cachedUsdToZarRate);
+            } else {
+                System.out.println("⚠️ Currency API Limit Reached. Using cached rate: R" + cachedUsdToZarRate);
             }
         } catch (Exception e) {
             System.err.println("⚠️ Currency API Failed (Using Cache): " + e.getMessage());
