@@ -46,7 +46,7 @@ export default function Dashboard() {
   const fetchData = async () => {
     const token = localStorage.getItem('token');
     if (!token) {
-      router.push('/login');
+      router.push('/'); // FIX: Redirect to root instead of /login
       return;
     }
 
@@ -70,7 +70,7 @@ export default function Dashboard() {
     } catch (err) {
       console.error(err);
       localStorage.removeItem('token');
-      router.push('/login');
+      router.push('/'); // FIX: Redirect to root instead of /login
     } finally {
       setLoading(false);
     }
@@ -78,7 +78,7 @@ export default function Dashboard() {
 
   const handleLogout = () => {
     localStorage.removeItem('token');
-    router.push('/login');
+    router.push('/'); // FIX: Redirect to root instead of /login
   };
 
   const handleDelete = async (id: number) => {
@@ -96,7 +96,6 @@ export default function Dashboard() {
     }
   };
 
-  // --- FIX: Add Refresh Logic ---
   const handleRefreshPrice = async (id: number) => {
     setRefreshingId(id);
     const token = localStorage.getItem('token');
@@ -267,7 +266,6 @@ export default function Dashboard() {
                         </div>
 
                         <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                          {/* FIX: Connect Refresh Logic */}
                           <button
                             onClick={() => handleRefreshPrice(asset.id)}
                             disabled={refreshingId === asset.id}
